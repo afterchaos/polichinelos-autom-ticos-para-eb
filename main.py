@@ -17,35 +17,6 @@ class AutoJJSApp(ctk.CTk):
         self.geometry("800x600")
         self.resizable(False, False)
         
-        # Set window icon
-        try:
-            # Try using standard tkinter's PhotoImage with PNG
-            from tkinter import PhotoImage
-            photo = PhotoImage(file="logo.png")
-            self.wm_iconphoto(False, photo)
-        except:
-            try:
-                # Try using customtkinter's wm_iconphoto method with PhotoImage
-                from PIL import Image, ImageTk
-                icon = Image.open("logo.png")
-                photo = ImageTk.PhotoImage(icon)
-                self.wm_iconphoto(False, photo)
-            except:
-                try:
-                    # Try to set icon using customtkinter method
-                    self.wm_iconbitmap("logo.png")
-                except:
-                    try:
-                        # Fallback to standard tkinter method
-                        self.iconbitmap("logo.png")
-                    except:
-                        try:
-                            # Try using absolute path
-                            import os
-                            abs_path = os.path.abspath("logo.png")
-                            self.iconbitmap(abs_path)
-                        except:
-                            pass  # If icon file is not found or not supported, continue without icon
 
         # Variáveis
         self.start_num = 1
