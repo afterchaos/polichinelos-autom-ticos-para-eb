@@ -16,6 +16,36 @@ class AutoJJSApp(ctk.CTk):
         self.title("AUTO JJS")
         self.geometry("800x600")
         self.resizable(False, False)
+        
+        # Set window icon
+        try:
+            # Try using standard tkinter's PhotoImage with PNG
+            from tkinter import PhotoImage
+            photo = PhotoImage(file="logo.png")
+            self.wm_iconphoto(False, photo)
+        except:
+            try:
+                # Try using customtkinter's wm_iconphoto method with PhotoImage
+                from PIL import Image, ImageTk
+                icon = Image.open("logo.png")
+                photo = ImageTk.PhotoImage(icon)
+                self.wm_iconphoto(False, photo)
+            except:
+                try:
+                    # Try to set icon using customtkinter method
+                    self.wm_iconbitmap("logo.png")
+                except:
+                    try:
+                        # Fallback to standard tkinter method
+                        self.iconbitmap("logo.png")
+                    except:
+                        try:
+                            # Try using absolute path
+                            import os
+                            abs_path = os.path.abspath("logo.png")
+                            self.iconbitmap(abs_path)
+                        except:
+                            pass  # If icon file is not found or not supported, continue without icon
 
         # Variáveis
         self.start_num = 1
@@ -26,6 +56,7 @@ class AutoJJSApp(ctk.CTk):
         self.listening_for_key = False
         self.is_running = False
         self.keyboard_controller = Controller()
+        self.exclamation_format = "junta"  # "junta" ou "separada"
         
         # Dicionários para conversão
         self.unidades = ['', 'UM', 'DOIS', 'TRÊS', 'QUATRO', 'CINCO', 'SEIS', 'SETE', 'OITO', 'NOVE']
@@ -54,7 +85,7 @@ class AutoJJSApp(ctk.CTk):
         self.sidebar.pack(side="left", fill="y")
         
         # Logo no frame lateral
-        self.logo_label = ctk.CTkLabel(self.sidebar, text="⚡", font=("Segoe UI", 24))
+        self.logo_label = ctk.CTkLabel(self.sidebar, text="", font=("Segoe UI", 24))
         self.logo_label.pack(pady=20)
         
         # Divider
@@ -109,7 +140,14 @@ class AutoJJSApp(ctk.CTk):
         # Start/Stop Button
         self.btn_toggle = ctk.CTkButton(self.settings_frame, text="ATIVAR", width=100, fg_color="#43b581", 
                                        hover_color="#3ca374", font=("Segoe UI Bold", 12), command=self.toggle_status)
-        self.btn_toggle.pack(side="left")
+        self.btn_toggle.pack(side="left", padx=(0, 10))
+
+        # Exclamation Toggle Button (next to ATIVAR)
+        self.exclamation_btn = ctk.CTkButton(self.settings_frame, text="JUNTA", width=100, 
+                                           fg_color="#5865f2", hover_color="#4752c4", 
+                                           font=("Segoe UI Bold", 12), corner_radius=8,
+                                           command=self.toggle_exclamation_format)
+        self.exclamation_btn.pack(side="left", padx=(0, 10))
 
         # Display Card
         self.card = ctk.CTkFrame(self.main_container, height=300, corner_radius=15, fg_color="#2b2d31")
@@ -268,7 +306,10 @@ class AutoJJSApp(ctk.CTk):
     def update_display(self):
         texto = self.numero_para_extenso(self.contador)
         self.number_label.configure(text=str(self.contador))
-        self.text_label.configure(text=texto + "!")
+        if self.exclamation_format == "junta":
+            self.text_label.configure(text=texto + "!")
+        else:
+            self.text_label.configure(text=texto + " !")
         
         # Formata o texto do contador com os novos limites
         self.counter_label.configure(text=f"{self.contador:,} / {self.end_num:,}".replace(',', '.'))
@@ -295,8 +336,25 @@ class AutoJJSApp(ctk.CTk):
         self.contador = self.start_num
         self.update_display()
 
+    def toggle_exclamation_format(self):
+        if self.exclamation_format == "junta":
+            self.exclamation_format = "separada"
+            self.exclamation_btn.configure(text="SEPARADA", fg_color="#36393f", hover_color="#2f3136")
+        else:
+            self.exclamation_format = "junta"
+            self.exclamation_btn.configure(text="JUNTA", fg_color="#5865f2", hover_color="#4752c4")
+        
+        self.update_display()
+
+    def get_formatted_text(self):
+        texto = self.numero_para_extenso(self.contador)
+        if self.exclamation_format == "junta":
+            return texto + "!"
+        else:
+            return texto + " !"
+
     def copy_to_clipboard(self):
-        texto = self.numero_para_extenso(self.contador) + "!"
+        texto = self.get_formatted_text()
         pyperclip.copy(texto)
 
     # Keyboard Listener
@@ -321,7 +379,7 @@ class AutoJJSApp(ctk.CTk):
         listener.start()
 
     def auto_type_and_advance(self):
-        texto = self.numero_para_extenso(self.contador) + "!"
+        texto = self.get_formatted_text()
         self.keyboard_controller.type(texto)
         self.next_number()
 
