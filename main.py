@@ -28,6 +28,13 @@ class AutoJJSApp(ctk.CTk):
         self.is_running = False
         self.keyboard_controller = Controller()
         self.exclamation_format = "junta"  # "junta" ou "separada"
+
+        # Cores Customizáveis
+        self.color_main = "#7289da"
+        self.color_btn_primary = "#5865f2"
+        self.color_btn_success = "#43b581"
+        self.color_btn_danger = "#f04747"
+        self.color_card_bg = "#2b2d31"
         
         # Dicionários para conversão
         self.unidades = ['', 'UM', 'DOIS', 'TRÊS', 'QUATRO', 'CINCO', 'SEIS', 'SETE', 'OITO', 'NOVE']
@@ -104,28 +111,28 @@ class AutoJJSApp(ctk.CTk):
         self.key_btn.pack(side="left", padx=(0, 10))
 
         # Apply Button
-        self.btn_apply = ctk.CTkButton(self.settings_frame, text="APLICAR", width=80, fg_color="#5865f2", 
-                                      hover_color="#4752c4", font=("Segoe UI Bold", 12), command=self.apply_settings)
+        self.btn_apply = ctk.CTkButton(self.settings_frame, text="APLICAR", width=80, fg_color=self.color_btn_primary, 
+                                      hover_color=self.color_btn_primary, font=("Segoe UI Bold", 12), command=self.apply_settings)
         self.btn_apply.pack(side="left", padx=(0, 10))
 
         # Start/Stop Button
-        self.btn_toggle = ctk.CTkButton(self.settings_frame, text="ATIVAR", width=100, fg_color="#43b581", 
-                                       hover_color="#3ca374", font=("Segoe UI Bold", 12), command=self.toggle_status)
+        self.btn_toggle = ctk.CTkButton(self.settings_frame, text="ATIVAR", width=100, fg_color=self.color_btn_success, 
+                                       hover_color=self.color_btn_success, font=("Segoe UI Bold", 12), command=self.toggle_status)
         self.btn_toggle.pack(side="left", padx=(0, 10))
 
         # Exclamation Toggle Button (next to ATIVAR)
         self.exclamation_btn = ctk.CTkButton(self.settings_frame, text="JUNTA", width=100, 
-                                           fg_color="#5865f2", hover_color="#4752c4", 
+                                           fg_color=self.color_btn_primary, hover_color=self.color_btn_primary, 
                                            font=("Segoe UI Bold", 12), corner_radius=8,
                                            command=self.toggle_exclamation_format)
         self.exclamation_btn.pack(side="left", padx=(0, 10))
 
         # Display Card
-        self.card = ctk.CTkFrame(self.main_container, height=300, corner_radius=15, fg_color="#2b2d31")
+        self.card = ctk.CTkFrame(self.main_container, height=300, corner_radius=15, fg_color=self.color_card_bg)
         self.card.pack(fill="x", pady=20)
         self.card.pack_propagate(False)
 
-        self.number_label = ctk.CTkLabel(self.card, text="1", font=("Segoe UI Bold", 120), text_color="#7289da")
+        self.number_label = ctk.CTkLabel(self.card, text="1", font=("Segoe UI Bold", 120), text_color=self.color_main)
         self.number_label.pack(expand=True, pady=(40, 0))
 
         self.text_label = ctk.CTkLabel(self.card, text="UM!", font=("Segoe UI Bold", 24))
@@ -146,11 +153,11 @@ class AutoJJSApp(ctk.CTk):
         self.buttons_frame = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.buttons_frame.pack(fill="x", pady=20)
 
-        self.btn_prev = ctk.CTkButton(self.buttons_frame, text="← ANTERIOR", fg_color="#f04747", hover_color="#d84040", 
+        self.btn_prev = ctk.CTkButton(self.buttons_frame, text="← ANTERIOR", fg_color=self.color_btn_danger, hover_color=self.color_btn_danger, 
                                     font=("Segoe UI Bold", 14), height=50, command=self.prev_number)
         self.btn_prev.pack(side="left", padx=5, expand=True, fill="x")
 
-        self.btn_next = ctk.CTkButton(self.buttons_frame, text="PRÓXIMO →", fg_color="#5865f2", hover_color="#4752c4", 
+        self.btn_next = ctk.CTkButton(self.buttons_frame, text="PRÓXIMO →", fg_color=self.color_btn_primary, hover_color=self.color_btn_primary, 
                                     font=("Segoe UI Bold", 14), height=50, command=self.next_number)
         self.btn_next.pack(side="left", padx=5, expand=True, fill="x")
 
@@ -158,7 +165,7 @@ class AutoJJSApp(ctk.CTk):
                                      font=("Segoe UI Bold", 14), height=50, command=self.reset_number)
         self.btn_reset.pack(side="left", padx=5, expand=True, fill="x")
 
-        self.btn_copy = ctk.CTkButton(self.buttons_frame, text="📋 COPIAR", fg_color="#43b581", hover_color="#3ca374", 
+        self.btn_copy = ctk.CTkButton(self.buttons_frame, text="📋 COPIAR", fg_color=self.color_btn_success, hover_color=self.color_btn_success, 
                                     font=("Segoe UI Bold", 14), height=50, command=self.copy_to_clipboard)
         self.btn_copy.pack(side="left", padx=5, expand=True, fill="x")
 
@@ -166,7 +173,7 @@ class AutoJJSApp(ctk.CTk):
         self.footer_frame = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.footer_frame.pack(fill="x", side="bottom")
 
-        self.footer_hint = ctk.CTkLabel(self.footer_frame, text=f"💡 Pressione {self.trigger_key_str} para avançar", font=("Segoe UI", 12), text_color="#7289da")
+        self.footer_hint = ctk.CTkLabel(self.footer_frame, text=f"💡 Pressione {self.trigger_key_str} para avançar", font=("Segoe UI", 12), text_color=self.color_main)
         self.footer_hint.pack(side="left")
 
         # Watermark
@@ -182,6 +189,11 @@ class AutoJJSApp(ctk.CTk):
         self.watermark_frame.lift()
 
         self.update_display()
+
+    def prev_number(self):
+        if self.contador > self.start_num:
+            self.contador -= 1
+            self.update_display()
 
     # Funções de Conversão (do script.py)
     def converter_grupo(self, num):
@@ -212,7 +224,7 @@ class AutoJJSApp(ctk.CTk):
     def numero_para_extenso(self, num):
         if num == 0: return 'ZERO'
         if num == 1000: return 'MIL'
-        if num == 10000: return 'DEZ MIL'
+        if num == 10000: return 'DEZ MIL'      
         
         grupos = []
         escala_idx = 0
@@ -229,7 +241,7 @@ class AutoJJSApp(ctk.CTk):
             escala_idx += 1
         
         grupos.reverse()
-        return ' E '.join(grupos).strip()
+        return ' '.join(grupos).strip()
 
     def start_key_capture(self):
         self.listening_for_key = True
@@ -246,9 +258,9 @@ class AutoJJSApp(ctk.CTk):
     def toggle_status(self):
         self.is_running = not self.is_running
         if self.is_running:
-            self.btn_toggle.configure(text="DESATIVAR", fg_color="#f04747", hover_color="#d84040")
+            self.btn_toggle.configure(text="DESATIVAR", fg_color=self.color_btn_danger, hover_color=self.color_btn_danger)
         else:
-            self.btn_toggle.configure(text="ATIVAR", fg_color="#43b581", hover_color="#3ca374")
+            self.btn_toggle.configure(text="ATIVAR", fg_color=self.color_btn_success, hover_color=self.color_btn_success)
 
     def apply_settings(self):
         try:
@@ -313,7 +325,7 @@ class AutoJJSApp(ctk.CTk):
             self.exclamation_btn.configure(text="SEPARADA", fg_color="#36393f", hover_color="#2f3136")
         else:
             self.exclamation_format = "junta"
-            self.exclamation_btn.configure(text="JUNTA", fg_color="#5865f2", hover_color="#4752c4")
+            self.exclamation_btn.configure(text="JUNTA", fg_color=self.color_btn_primary, hover_color=self.color_btn_primary)
         
         self.update_display()
 
