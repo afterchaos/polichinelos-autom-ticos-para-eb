@@ -223,8 +223,6 @@ class AutoJJSApp(ctk.CTk):
 
     def numero_para_extenso(self, num):
         if num == 0: return 'ZERO'
-        if num == 1000: return 'MIL'
-        if num == 10000: return 'DEZ MIL'      
         
         grupos = []
         escala_idx = 0
@@ -234,14 +232,32 @@ class AutoJJSApp(ctk.CTk):
             if grupo != 0:
                 texto_grupo = self.converter_grupo(grupo)
                 if escala_idx == 1:
-                    if grupo == 1: texto_grupo = 'MIL'
-                    else: texto_grupo += ' MIL'
+                    if grupo == 1: 
+                        texto_grupo = 'MIL'
+                    else: 
+                        texto_grupo += ' MIL'
                 grupos.append(texto_grupo)
             temp_num //= 1000
             escala_idx += 1
         
         grupos.reverse()
-        return ' '.join(grupos).strip()
+        
+        # Para números exatos de milhares (1000, 2000, 3000, etc.), adicionar "E" + o número
+        if num % 1000 == 0 and num >= 1000:
+            milhar = num // 1000
+            if milhar == 1:
+                return 'MIL E UM'
+            else:
+                parte_milhar = self.converter_grupo(milhar)
+                return f'{parte_milhar} MIL E {parte_milhar}'
+        
+        # Para números com milhares e parte restante, adicionar "E" entre eles
+        if len(grupos) == 2 and (grupos[0].endswith(' MIL') or grupos[0] == 'MIL'):
+            # Temos milhares e uma parte restante, adicionar "E" entre eles
+            return grupos[0] + ' E ' + grupos[1]
+        
+        resultado = ' '.join(grupos).strip()
+        return resultado
 
     def start_key_capture(self):
         self.listening_for_key = True
