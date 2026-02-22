@@ -206,7 +206,7 @@ class AutoJJSApp(ctk.CTk):
         
         resto = num % 100
         if resto > 0:
-            if c > 0 and not (c == 1 and num % 100 > 0): resultado.append('E')
+            if c > 0: resultado.append('E')
             if 10 <= resto <= 19:
                 resultado.append(self.teenagers[resto - 10])
             else:
@@ -243,11 +243,11 @@ class AutoJJSApp(ctk.CTk):
         grupos.reverse()
         
         # Para números com milhares e parte restante, adicionar "E" entre eles
-        # Adiciona "E" apenas quando há milhares e o resto é exatamente centenas (100, 200, 300, etc.)
+        # Adiciona "E" para todos os casos onde há milhares e resto
         if len(grupos) == 2 and (grupos[0].endswith(' MIL') or grupos[0] == 'MIL'):
             resto = num % 1000
-            if resto > 0 and resto % 100 == 0:
-                # Temos milhares e apenas centenas, adicionar "E" entre eles
+            if resto > 0:
+                # Temos milhares e resto, adicionar "E" entre eles
                 return grupos[0] + ' E ' + grupos[1]
         
         resultado = ' '.join(grupos).strip()

@@ -1,4 +1,4 @@
-('c:\\Users\\chaos\\Desktop\\autoJJS_bywithering\\build\\main\\PYZ-00.pyz',
+('c:\\Users\\chaos\\Desktop\\autoJJS_bywithering\\build\\AutoJJS\\PYZ-00.pyz',
  [('PIL',
    'C:\\Users\\chaos\\AppData\\Local\\Programs\\Python\\Python310\\lib\\site-packages\\PIL\\__init__.py',
    'PYMODULE'),
