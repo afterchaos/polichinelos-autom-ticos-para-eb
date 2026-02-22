@@ -243,12 +243,13 @@ class AutoJJSApp(ctk.CTk):
         grupos.reverse()
         
         # Para números com milhares e parte restante, adicionar "E" entre eles
-        # Adiciona "E" para todos os casos onde há milhares e resto
+        # "E" para: 1-99 (unidades/dezenas) ou múltiplos de 100 (200, 300... 900)
         if len(grupos) == 2 and (grupos[0].endswith(' MIL') or grupos[0] == 'MIL'):
             resto = num % 1000
             if resto > 0:
-                # Temos milhares e resto, adicionar "E" entre eles
-                return grupos[0] + ' E ' + grupos[1]
+                # Adiciona "E" para restos 1-99 ou centenas redondas (100, 200, 300...)
+                if resto < 100 or resto % 100 == 0:
+                    return grupos[0] + ' E ' + grupos[1]
         
         resultado = ' '.join(grupos).strip()
         return resultado
