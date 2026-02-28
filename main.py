@@ -13,7 +13,7 @@ from updater import run_auto_update
 # Configurações do Aplicativo
 APP_VERSION = "1.0.0"
 REPO_OWNER = "afterchaos"
-REPO_NAME = "autoJJS_bywithering"
+REPO_NAME = "polichinelos-autom-ticos-para-eb"
 EXECUTABLE_NAME = "AutoJJS.exe"
 
 # Configurações do CustomTkinter
