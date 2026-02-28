@@ -8,6 +8,14 @@ from pynput.keyboard import Controller
 from config_manager import ConfigManager
 from auto_typer import AutoTyper
 
+from updater import run_auto_update
+
+# Configurações do Aplicativo
+APP_VERSION = "1.0.0"
+REPO_OWNER = "witheringfeelings"
+REPO_NAME = "autoJJS_bywithering"
+EXECUTABLE_NAME = "AutoJJS.exe"
+
 # Configurações do CustomTkinter
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("blue")
@@ -15,8 +23,14 @@ ctk.set_default_color_theme("blue")
 class AutoJJSApp(ctk.CTk):
     def __init__(self):
         super().__init__()
+        
+        # Inicia verificação de atualização antes de tudo
+        try:
+            run_auto_update(REPO_OWNER, REPO_NAME, APP_VERSION, EXECUTABLE_NAME)
+        except Exception as e:
+            print(f"Erro no auto-update: {e}")
 
-        self.title("AUTO JJS")
+        self.title(f"AUTO JJS - v{APP_VERSION}")
         self.geometry("900x650")
         self.resizable(False, False)
         
