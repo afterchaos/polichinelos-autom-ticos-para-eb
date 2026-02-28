@@ -12,7 +12,7 @@ from updater import run_auto_update
 
 # Configurações do Aplicativo
 APP_VERSION = "1.0.0"
-REPO_OWNER = "witheringfeelings"
+REPO_OWNER = "afterchaos"
 REPO_NAME = "autoJJS_bywithering"
 EXECUTABLE_NAME = "AutoJJS.exe"
 
