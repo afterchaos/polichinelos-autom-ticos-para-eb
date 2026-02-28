@@ -11,7 +11,7 @@ from auto_typer import AutoTyper
 from updater import run_auto_update
 
 # Configurações do Aplicativo
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.0.2"
 REPO_OWNER = "afterchaos"
 REPO_NAME = "polichinelos-autom-ticos-para-eb"
 EXECUTABLE_NAME = "AutoJJS.exe"
