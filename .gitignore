@@ -1,2 +1,5 @@
 dist/
 build/
+*.bat
+__pycache__/
+*.pyc
