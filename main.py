@@ -834,9 +834,10 @@ class AutoJJSApp(ctk.CTk):
                     
                     current_num += 1
                     
-                    # Reseta no limite configurado
+                    # Interrompe a sequência quando terminar os números
                     if current_num > auto_end:
-                        current_num = auto_start
+                        self.sequence_active = False
+                        break
                         
             except Exception as e:
                 print(f"Erro na sequência contínua: {e}")
