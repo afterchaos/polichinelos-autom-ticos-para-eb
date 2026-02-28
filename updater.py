@@ -14,21 +14,25 @@ class Updater:
         self.current_version = current_version
         self.executable_name = executable_name
         self.api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+        self.headers = {"User-Agent": "Mozilla/5.0"}
 
     def check_for_updates(self):
         """Verifica se há uma nova versão disponível no GitHub Releases."""
         try:
-            response = requests.get(self.api_url, timeout=10)
+            response = requests.get(self.api_url, headers=self.headers, timeout=10)
             response.raise_for_status()
             release_data = response.json()
             
             latest_version = release_data["tag_name"].lstrip("v")
             
+            # Comparação de versão semântica
             if parse_version(latest_version) > parse_version(self.current_version):
                 return release_data
             return None
         except Exception as e:
-            print(f"Erro ao verificar atualizações: {e}")
+            # Mostra erro apenas se não for timeout (evita incomodar se a net cair)
+            if not isinstance(e, requests.exceptions.Timeout):
+                print(f"Erro ao verificar atualizações: {e}")
             return None
 
     def download_and_install(self, release_data):
@@ -37,22 +41,26 @@ class Updater:
             # Encontrar o asset que é um .exe
             assets = release_data.get("assets", [])
             download_url = None
+            asset_name = ""
             for asset in assets:
-                if asset["name"].endswith(".exe"):
+                if asset["name"].lower().endswith(".exe"):
                     download_url = asset["browser_download_url"]
+                    asset_name = asset["name"]
                     break
             
             if not download_url:
-                messagebox.showerror("Erro", "Nenhum executável encontrado na release mais recente.")
+                print("Nenhum asset .exe encontrado na release.")
                 return
 
-            # Criar janela de aviso de download
+            # Janela invisível para diálogo
             root = Tk()
             root.withdraw()
+            root.attributes("-topmost", True)
             
             if not messagebox.askyesno("Atualização Disponível", 
                                      f"Uma nova versão ({release_data['tag_name']}) está disponível.\n\n"
-                                     f"Deseja atualizar agora?"):
+                                     f"Deseja atualizar agora?\n(O download pode levar alguns segundos)",
+                                     parent=root):
                 root.destroy()
                 return
 
@@ -60,39 +68,60 @@ class Updater:
             temp_dir = tempfile.gettempdir()
             new_exe_path = os.path.join(temp_dir, "update_new.exe")
             
-            # Download
-            response = requests.get(download_url, stream=True)
+            # Download via requests com stream
+            response = requests.get(download_url, headers=self.headers, stream=True)
             response.raise_for_status()
             
+            # Tentar baixar e salvar
             with open(new_exe_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
+                    if chunk:
+                        f.write(chunk)
 
             self._apply_update(new_exe_path)
             root.destroy()
             
         except Exception as e:
-            messagebox.showerror("Erro na Atualização", f"Ocorreu um erro ao baixar a atualização:\n{e}")
+            root = Tk()
+            root.withdraw()
+            root.attributes("-topmost", True)
+            messagebox.showerror("Erro na Atualização", f"Ocorreu um erro ao baixar a atualização:\n{e}", parent=root)
+            root.destroy()
 
     def _apply_update(self, new_exe_path):
         """Cria o script .bat para substituir o arquivo e reiniciar o app."""
-        current_exe = os.path.abspath(sys.argv[0])
+        # sys.executable é o caminho real do .exe quando compilado
+        current_exe = os.path.abspath(sys.executable)
+        exe_dir = os.path.dirname(current_exe)
+        exe_filename = os.path.basename(current_exe)
+        
         batch_path = os.path.join(tempfile.gettempdir(), "update_script.bat")
         
-        # O script .bat aguarda o encerramento, deleta o antigo, move o novo e reinicia
+        # O script .bat aguarda o encerramento, tenta deletar em loop e reinicia
         batch_content = f"""@echo off
-setlocal
-taskkill /f /im "{os.path.basename(current_exe)}" >nul 2>&1
-timeout /t 2 /nobreak >nul
-:retry
-del /f /q "{current_exe}"
+setlocal enabledelayedexpansion
+title Atualizador de Sistema
+echo Aguardando o encerramento do aplicativo...
+
+:wait_close
+taskkill /f /im "{exe_filename}" >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+:retry_del
 if exist "{current_exe}" (
-    timeout /t 1 /nobreak >nul
-    goto retry
+    del /f /q "{current_exe}" >nul 2>&1
+    if exist "{current_exe}" (
+        timeout /t 1 /nobreak >nul
+        goto retry_del
+    )
 )
-move /y "{new_exe_path}" "{current_exe}"
+
+echo Instalando nova versao...
+move /y "{new_exe_path}" "{current_exe}" >nul 2>&1
+
+echo Reiniciando...
 start "" "{current_exe}"
-del "%~f0"
+del "%~f0" & exit
 """
 
         with open(batch_path, "w") as f:
@@ -104,7 +133,12 @@ del "%~f0"
         sys.exit(0)
 
 def run_auto_update(owner, repo, version, exe_name):
-    """Função auxiliar para facilitar a chamada no início do app."""
+    """Função auxiliar que só executa se o app estiver compilado."""
+    # Evita que o script tente se atualizar enquanto roda via Python puro
+    if not getattr(sys, 'frozen', False):
+        print("Rodando via script (não compilado). Ignorando auto-update.")
+        return
+        
     updater = Updater(owner, repo, version, exe_name)
     update_data = updater.check_for_updates()
     if update_data:
