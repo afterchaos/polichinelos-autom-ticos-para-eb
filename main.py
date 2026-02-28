@@ -227,7 +227,7 @@ class AutoJJSApp(ctk.CTk):
         title_label = ctk.CTkLabel(header_frame, text="⚡ AUTO JJS", font=("Segoe UI Bold", 28))
         title_label.pack(anchor="w")
         
-        subtitle_label = ctk.CTkLabel(header_frame, text="⌨ Configure os limites e a tecla de acionamento abaixo", 
+        subtitle_label = ctk.CTkLabel(header_frame, text="⌨ Configure os limites dos JJ's e a tecla de acionamento abaixo:", 
                                          font=("Segoe UI", 12), text_color="gray")
         subtitle_label.pack(anchor="w")
 
