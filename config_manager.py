@@ -33,6 +33,16 @@ class ConfigManager:
                 "auto_send_enter": True,
                 "start_num": 1,
                 "end_num": 10000
+            },
+            "semi_auto": {
+                "enabled": False,
+                "hotkey": "f8",
+                "prefix_key": ";",
+                "delay_ms": 50,
+                "auto_send_enter": True,
+                "start_num": 1,
+                "end_num": 10000,
+                "auto_skip_space": True
             }
         }
 

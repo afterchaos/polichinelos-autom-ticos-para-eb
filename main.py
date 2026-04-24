@@ -68,6 +68,19 @@ class AutoJJSApp(ctk.CTk):
         self.auto_type_start_num = self.config_manager.get("auto_type", "start_num", 1)
         self.auto_type_end_num = self.config_manager.get("auto_type", "end_num", 10000)
 
+        # Variáveis - Semi Auto Tab
+        self.semi_auto_enabled = self.config_manager.get("semi_auto", "enabled", False)
+        self.semi_auto_hotkey_str = self.config_manager.get("semi_auto", "hotkey", "f8").lower()
+        self.semi_auto_hotkey_obj = self._parse_key_string(self.semi_auto_hotkey_str)
+        self.semi_auto_prefix_key = self.config_manager.get("semi_auto", "prefix_key", ";")
+        self.semi_auto_delay_ms = self.config_manager.get("semi_auto", "delay_ms", 50)
+        self.semi_auto_send_enter = self.config_manager.get("semi_auto", "auto_send_enter", True)
+        self.semi_auto_start_num = self.config_manager.get("semi_auto", "start_num", 1)
+        self.semi_auto_end_num = self.config_manager.get("semi_auto", "end_num", 10000)
+        self.semi_auto_skip_space = self.config_manager.get("semi_auto", "auto_skip_space", True)
+        self.listening_for_semi_auto_key = False
+        self.listening_for_semi_auto_prefix = False
+
         # Cores Customizáveis
         self.color_main = "#7289da"
         self.color_btn_primary = "#5865f2"
@@ -182,6 +195,10 @@ class AutoJJSApp(ctk.CTk):
             if event.widget == self.auto_type_start_entry._entry or event.widget == self.auto_type_end_entry._entry:
                 return
                 
+            # Permite clicar nos campos de entrada da aba Semi Auto
+            if event.widget == self.semi_auto_start_entry._entry or event.widget == self.semi_auto_end_entry._entry:
+                return
+                
             # Remove foco de outros widgets
             self.focus()
         except:
@@ -214,9 +231,13 @@ class AutoJJSApp(ctk.CTk):
         
         # Aba 2: Configuração de Auto Type
         self.tab_config = self.tabview.add("⚙️ JJ'S AFK")
+
+        # Aba 3: Configuração de Semi Auto
+        self.tab_semi = self.tabview.add("⚡ AFK-JOGO")
         
         self.setup_main_tab()
         self.setup_config_tab()
+        self.setup_semi_auto_tab()
 
 
     def setup_main_tab(self):
@@ -478,6 +499,169 @@ class AutoJJSApp(ctk.CTk):
         self.auto_send_enter = self.auto_enter_toggle.get()
         self.config_manager.set("auto_type", "auto_send_enter", self.auto_send_enter)
 
+    def setup_semi_auto_tab(self):
+        # Frame principal com rolagem
+        self.semi_auto_scroll = ctk.CTkScrollableFrame(self.tab_semi, fg_color="transparent")
+        self.semi_auto_scroll.pack(fill="both", expand=True)
+
+        # Title
+        title = ctk.CTkLabel(self.semi_auto_scroll, text="⚡ Configuração Semi-Auto", 
+                            font=("Segoe UI Bold", 24), text_color=self.color_main)
+        title.pack(pady=(20, 10), anchor="w", padx=20)
+
+        subtitle = ctk.CTkLabel(self.semi_auto_scroll, text="Modo com prefixo e pulo automático de animação",
+                               font=("Segoe UI", 12), text_color="gray")
+        subtitle.pack(anchor="w", padx=20, pady=(0, 20))
+
+        # Main Frame
+        main_frame = ctk.CTkFrame(self.semi_auto_scroll, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Card 1: Ativar/Desativar
+        card1 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card1.pack(fill="x", pady=(0, 15))
+
+        header1 = ctk.CTkFrame(card1, fg_color="transparent")
+        header1.pack(fill="x", padx=20, pady=15)
+
+        label1 = ctk.CTkLabel(header1, text="🎯 Modo AFK-JOGO", font=("Segoe UI Bold", 14))
+        label1.pack(side="left", anchor="w")
+
+        self.semi_auto_toggle = ctk.CTkSwitch(header1, text="", onvalue=True, offvalue=False,
+                                             command=self.toggle_semi_auto_mode)
+        self.semi_auto_toggle.pack(side="right")
+        self.semi_auto_toggle.select() if self.semi_auto_enabled else self.semi_auto_toggle.deselect()
+
+        # Card 2: Configurar Limites
+        card2 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card2.pack(fill="x", pady=(0, 15))
+
+        content2 = ctk.CTkFrame(card2, fg_color="transparent")
+        content2.pack(fill="x", padx=20, pady=15)
+
+        label2 = ctk.CTkLabel(content2, text="🔢 Limites da Sequência:", font=("Segoe UI Bold", 12))
+        label2.pack(anchor="w", pady=(0, 10))
+
+        limits_frame = ctk.CTkFrame(content2, fg_color="transparent")
+        limits_frame.pack(fill="x", pady=(0, 10))
+
+        start_label = ctk.CTkLabel(limits_frame, text="Início:", font=("Segoe UI Bold", 11))
+        start_label.pack(side="left", padx=(0, 5))
+        self.semi_auto_start_entry = ctk.CTkEntry(limits_frame, width=70)
+        self.semi_auto_start_entry.insert(0, str(self.semi_auto_start_num))
+        self.semi_auto_start_entry.pack(side="left", padx=(0, 10))
+
+        end_label = ctk.CTkLabel(limits_frame, text="Fim:", font=("Segoe UI Bold", 11))
+        end_label.pack(side="left", padx=(0, 5))
+        self.semi_auto_end_entry = ctk.CTkEntry(limits_frame, width=70)
+        self.semi_auto_end_entry.insert(0, str(self.semi_auto_end_num))
+        self.semi_auto_end_entry.pack(side="left", padx=(0, 10))
+
+        apply_limits_btn = ctk.CTkButton(limits_frame, text="APLICAR", width=80, fg_color=self.color_btn_primary, 
+                                        hover_color=self.color_btn_primary, font=("Segoe UI Bold", 10), 
+                                        command=self.apply_semi_auto_limits)
+        apply_limits_btn.pack(side="left", padx=(0, 10))
+
+        # Card 3: Configurar Hotkey e Prefixo
+        card3 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card3.pack(fill="x", pady=(0, 15))
+
+        content3 = ctk.CTkFrame(card3, fg_color="transparent")
+        content3.pack(fill="x", padx=20, pady=15)
+
+        hotkey_label = ctk.CTkLabel(content3, text="⌨️ Tecla de Ativação:", font=("Segoe UI Bold", 12))
+        hotkey_label.pack(anchor="w", pady=(0, 10))
+
+        self.semi_auto_hotkey_btn = ctk.CTkButton(content3, text=self.semi_auto_hotkey_str.upper(),
+                                                  width=100, command=self.start_semi_auto_key_capture,
+                                                  font=("Segoe UI Bold", 11))
+        self.semi_auto_hotkey_btn.pack(anchor="w", padx=(0, 10), pady=(0, 15))
+
+        prefix_label = ctk.CTkLabel(content3, text="❗ Tecla pra abrir o chat:", font=("Segoe UI Bold", 12))
+        prefix_label.pack(anchor="w", pady=(0, 10))
+
+        self.semi_auto_prefix_btn = ctk.CTkButton(content3, text=self.semi_auto_prefix_key.upper(),
+                                                  width=100, command=self.start_semi_auto_prefix_capture,
+                                                  font=("Segoe UI Bold", 11))
+        self.semi_auto_prefix_btn.pack(anchor="w", padx=(0, 10))
+
+        # Card 4: Delay e Opções
+        card4 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card4.pack(fill="x", pady=(0, 15))
+
+        content4 = ctk.CTkFrame(card4, fg_color="transparent")
+        content4.pack(fill="x", padx=20, pady=15)
+
+        label_delay = ctk.CTkLabel(content4, text="⏱️ Tempo por Letra (ms):", font=("Segoe UI Bold", 12))
+        label_delay.pack(anchor="w", pady=(0, 10))
+
+        slider_frame = ctk.CTkFrame(content4, fg_color="transparent")
+        slider_frame.pack(fill="x", pady=(0, 10))
+
+        self.semi_delay_slider = ctk.CTkSlider(slider_frame, from_=10, to=500, number_of_steps=49,
+                                          command=self.update_semi_auto_delay_value)
+        self.semi_delay_slider.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.semi_delay_slider.set(self.semi_auto_delay_ms)
+
+        self.semi_delay_value_label = ctk.CTkLabel(slider_frame, text=f"{self.semi_auto_delay_ms}ms",
+                                             font=("Segoe UI Bold", 11), width=60, text_color=self.color_main)
+        self.semi_delay_value_label.pack(side="left")
+
+        # Switches Frame
+        switches_frame = ctk.CTkFrame(content4, fg_color="transparent")
+        switches_frame.pack(fill="x", pady=(10, 0))
+
+        enter_label = ctk.CTkLabel(switches_frame, text="📤 Enviar (Enter)", font=("Segoe UI Bold", 12))
+        enter_label.pack(side="left", anchor="w")
+
+        self.semi_enter_toggle = ctk.CTkSwitch(switches_frame, text="", onvalue=True, offvalue=False,
+                                              command=self.toggle_semi_auto_send_enter)
+        self.semi_enter_toggle.pack(side="left", padx=(10, 20))
+        self.semi_enter_toggle.select() if self.semi_auto_send_enter else self.semi_enter_toggle.deselect()
+
+        skip_label = ctk.CTkLabel(switches_frame, text="🏃 Pular (Espaço)", font=("Segoe UI Bold", 12))
+        skip_label.pack(side="left", anchor="w")
+
+        self.semi_skip_toggle = ctk.CTkSwitch(switches_frame, text="", onvalue=True, offvalue=False,
+                                             command=self.toggle_semi_auto_skip_space)
+        self.semi_skip_toggle.pack(side="left", padx=(10, 0))
+        self.semi_skip_toggle.select() if self.semi_auto_skip_space else self.semi_skip_toggle.deselect()
+
+    def toggle_semi_auto_mode(self):
+        self.semi_auto_enabled = self.semi_auto_toggle.get()
+        self.config_manager.set("semi_auto", "enabled", self.semi_auto_enabled)
+
+    def start_semi_auto_key_capture(self):
+        self.listening_for_semi_auto_key = True
+        self.semi_auto_hotkey_btn.configure(text="AGUARDANDO...")
+
+    def start_semi_auto_prefix_capture(self):
+        self.listening_for_semi_auto_prefix = True
+        self.semi_auto_prefix_btn.configure(text="AGUARDANDO...")
+
+    def update_semi_auto_delay_value(self, value):
+        self.semi_auto_delay_ms = int(float(value))
+        self.semi_delay_value_label.configure(text=f"{self.semi_auto_delay_ms}ms")
+        self.config_manager.set("semi_auto", "delay_ms", self.semi_auto_delay_ms)
+
+    def toggle_semi_auto_send_enter(self):
+        self.semi_auto_send_enter = self.semi_enter_toggle.get()
+        self.config_manager.set("semi_auto", "auto_send_enter", self.semi_auto_send_enter)
+
+    def toggle_semi_auto_skip_space(self):
+        self.semi_auto_skip_space = self.semi_skip_toggle.get()
+        self.config_manager.set("semi_auto", "auto_skip_space", self.semi_auto_skip_space)
+
+    def apply_semi_auto_limits(self):
+        try:
+            self.semi_auto_start_num = int(self.semi_auto_start_entry.get())
+            self.semi_auto_end_num = int(self.semi_auto_end_entry.get())
+            self.config_manager.set("semi_auto", "start_num", self.semi_auto_start_num)
+            self.config_manager.set("semi_auto", "end_num", self.semi_auto_end_num)
+            self.focus()
+        except:
+            pass
+
     def prev_number(self):
         if self.contador > self.start_num:
             self.contador -= 1
@@ -703,9 +887,27 @@ class AutoJJSApp(ctk.CTk):
                         self.sequence_active = True
                         self.after(0, self.start_continuous_sequence, self.auto_type_start_num, has_char)
                     return
+
+            # Verifica se é a hotkey do Semi Auto
+            is_semi_auto_hotkey = self.semi_auto_enabled and self._is_key_pressed(key, self.semi_auto_hotkey_obj)
+
+            if is_semi_auto_hotkey:
+                if self.is_typing_char:
+                    return
+                
+                if current_time - self.last_hotkey_time > 0.2:
+                    self.last_hotkey_time = current_time
+                    
+                    if self.sequence_active:
+                        self.sequence_active = False
+                    else:
+                        has_char = hasattr(key, 'char') and key.char
+                        self.sequence_active = True
+                        self.after(0, self.start_semi_auto_sequence, self.semi_auto_start_num, has_char)
+                    return
             
             # Se o programa está digitando outros caracteres, ignoramos o resto do listener
-            if self.typing_automatically and not is_auto_type_hotkey:
+            if self.typing_automatically and not is_auto_type_hotkey and not is_semi_auto_hotkey:
                 return
 
             # 1. Verifica se está capturando teclas para configuração
@@ -726,6 +928,27 @@ class AutoJJSApp(ctk.CTk):
                 self.config_manager.set("auto_type", "hotkey", self.auto_type_hotkey_str)
                 
                 self.after(0, lambda: self.auto_type_hotkey_btn.configure(text=self.auto_type_hotkey_str.upper()))
+                return
+
+            if self.listening_for_semi_auto_key:
+                self.semi_auto_hotkey_obj = key
+                self.semi_auto_hotkey_str = self.format_key_name(key).lower()
+                self.listening_for_semi_auto_key = False
+                self.config_manager.set("semi_auto", "hotkey", self.semi_auto_hotkey_str)
+                self.after(0, lambda: self.semi_auto_hotkey_btn.configure(text=self.semi_auto_hotkey_str.upper()))
+                return
+
+            if self.listening_for_semi_auto_prefix:
+                char = ""
+                if hasattr(key, 'char') and key.char:
+                    char = key.char
+                else:
+                    char = self.format_key_name(key)
+                
+                self.semi_auto_prefix_key = char
+                self.listening_for_semi_auto_prefix = False
+                self.config_manager.set("semi_auto", "prefix_key", char)
+                self.after(0, lambda: self.semi_auto_prefix_btn.configure(text=char.upper()))
                 return
 
             # Se algum campo de entrada estiver em foco, ignoramos hotkeys normais (caracteres)
@@ -805,16 +1028,24 @@ class AutoJJSApp(ctk.CTk):
             self.sequence_running = True
             try:
                 # Se a hotkey foi um caractere, apaga ele antes de começar a sequência
+                self.after(0, lambda: self.footer_hint.configure(text="🟢 AFK ATIVO: Pressione a hotkey para parar", text_color=self.color_btn_success))
+                
                 if needs_backspace:
                     self.is_typing_char = True
                     self.keyboard_controller.press(keyboard.Key.backspace)
                     self.keyboard_controller.release(keyboard.Key.backspace)
-                    time.sleep(0.05)  # Reduzido de 0.1 para 0.05
+                    time.sleep(0.05)
                     self.is_typing_char = False
 
                 current_num = start_num
                 # Inicia a sequência enquanto habilitada e ativa
                 while self.auto_type_enabled and self.sequence_active:
+                    # 0. Verifica se Discord está ativo
+                    if not self.auto_typer.is_discord_active():
+                        self.sequence_active = False
+                        self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
+                        break
+
                     text = self.numero_para_extenso(current_num)
                     if self.exclamation_format == "junta":
                         text += "!"
@@ -829,7 +1060,7 @@ class AutoJJSApp(ctk.CTk):
                         if not self.sequence_active: break
                         self.is_typing_char = True
                         self.keyboard_controller.type(char)
-                        time.sleep(0.0001)  # Reduzido de 0.001 para 0.0001
+                        time.sleep(0.0001)
                         self.is_typing_char = False
                         time.sleep(self.auto_type_delay_ms / 1000.0)
                     
@@ -839,14 +1070,27 @@ class AutoJJSApp(ctk.CTk):
                         self.keyboard_controller.press(keyboard.Key.enter)
                         self.keyboard_controller.release(keyboard.Key.enter)
                         self.is_typing_char = False
+                        
+                        # VERIFICAÇÃO DE SUCESSO: Se o texto ainda estiver na caixa, paramos na hora.
+                        # Isso detecta Castigo (Timeout), Slow mode ou falta de campo de texto.
+                        time.sleep(0.25) 
+                        if not self.auto_typer.check_message_sent():
+                            self.sequence_active = False
+                            # Limpa a caixa para não bugar o próximo envio
+                            self.auto_typer.clear_textbox()
+                            self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Falha no envio (Castigo/Slow)", text_color=self.color_btn_danger))
+                            break
                     
-                    # Desmarca para permitir toggle no intervalo ou após terminar
+                    # Desmarca para permitir toggle
                     self.typing_automatically = False
                     
-                    # Pequeno delay entre números
-                    time.sleep(0.05)  # Reduzido de 0.1 para 0.05
-                    
                     current_num += 1
+                    # Atualiza o número de início para que ele continue de onde parou ao reiniciar
+                    self.auto_type_start_num = current_num
+                    self.after(0, self._update_auto_type_entry, current_num)
+                    
+                    # Pequeno delay entre números
+                    time.sleep(0.05)
                     
                     # Interrompe a sequência quando terminar os números
                     if current_num > auto_end:
@@ -860,10 +1104,24 @@ class AutoJJSApp(ctk.CTk):
                 self.sequence_active = False
                 self.sequence_running = False
                 self.typing_automatically = False  # Marca que o programa parou de digitar
+                # Restaura o hint original se não houver erro (ou após um tempo)
+                self.after(3000, lambda: self.footer_hint.configure(
+                    text=f"💡 Pressione {self.trigger_key_str} para avançar", 
+                    text_color=self.color_main
+                ))
         
         import threading
         thread = threading.Thread(target=sequence_thread, daemon=True)
         thread.start()
+
+    def _update_auto_type_entry(self, num):
+        """Atualiza o campo de entrada do número inicial na interface"""
+        try:
+            self.auto_type_start_entry.delete(0, "end")
+            self.auto_type_start_entry.insert(0, str(num))
+            self.config_manager.set("auto_type", "start_num", num)
+        except:
+            pass
 
     def auto_type_and_advance(self):
         texto = self.get_formatted_text()
@@ -894,6 +1152,108 @@ class AutoJJSApp(ctk.CTk):
             self.auto_type_start_num = new_start
             self.auto_type_end_num = new_end
         except ValueError:
+            pass
+
+    def start_semi_auto_sequence(self, start_num=1, needs_backspace=False):
+        """Inicia a digitação automática semi-automática (com prefixo e pulo de proteção)"""
+        if hasattr(self, 'sequence_running') and self.sequence_running:
+            return
+
+        semi_start = self.semi_auto_start_num
+        semi_end = self.semi_auto_end_num
+        
+        if start_num < semi_start:
+            start_num = semi_start
+        elif start_num > semi_end:
+            start_num = semi_start
+        
+        def sequence_thread():
+            self.sequence_running = True
+            try:
+                self.after(0, lambda: self.footer_hint.configure(text="⚡ AKF-JOGO ATIVO: Pressione hotkey para parar", text_color=self.color_main))
+                
+                if needs_backspace:
+                    self.is_typing_char = True
+                    self.keyboard_controller.press(keyboard.Key.backspace)
+                    self.keyboard_controller.release(keyboard.Key.backspace)
+                    time.sleep(0.05)
+                    self.is_typing_char = False
+
+                current_num = start_num
+                while self.semi_auto_enabled and self.sequence_active:
+                    # Não verifica se o Discord está ativo aqui, pois esse modo é focado no jogo (Roblox)
+
+                    text = self.numero_para_extenso(current_num)
+                    if self.exclamation_format == "junta":
+                        text += "!"
+                    else:
+                        text += " !"
+                    
+                    self.typing_automatically = True
+                    
+                    # 1. Digita o Prefixo
+                    if self.semi_auto_prefix_key:
+                        self.is_typing_char = True
+                        self.keyboard_controller.type(self.semi_auto_prefix_key)
+                        time.sleep(self.semi_auto_delay_ms / 1000.0)
+                        self.is_typing_char = False
+                    
+                    # 2. Digita o texto JJS
+                    for char in text:
+                        if not self.sequence_active: break
+                        self.is_typing_char = True
+                        self.keyboard_controller.type(char)
+                        time.sleep(0.0001)
+                        self.is_typing_char = False
+                        time.sleep(self.semi_auto_delay_ms / 1000.0)
+                    
+                    # 3. Envia Enter
+                    if self.semi_auto_send_enter and self.sequence_active:
+                        self.is_typing_char = True
+                        self.keyboard_controller.press(keyboard.Key.enter)
+                        self.keyboard_controller.release(keyboard.Key.enter)
+                        self.is_typing_char = False
+                        
+                    # 4. Pula Animação (Espaço) se habilitado
+                    if self.semi_auto_skip_space and self.sequence_active:
+                        time.sleep(0.3) # Maior delay para garantir que o chat do Roblox fechou
+                        self.is_typing_char = True
+                        self.keyboard_controller.press(keyboard.Key.space)
+                        time.sleep(0.05) # Segura a tecla por 50ms para o jogo registrar o pulo
+                        self.keyboard_controller.release(keyboard.Key.space)
+                        self.is_typing_char = False
+                    
+                    self.typing_automatically = False
+                    current_num += 1
+                    self.semi_auto_start_num = current_num
+                    self.after(0, self._update_semi_auto_entry, current_num)
+                    
+                    time.sleep(0.05)
+                    if current_num > semi_end:
+                        self.sequence_active = False
+                        break
+                        
+            except Exception as e:
+                print(f"Erro na sequência semi-auto: {e}")
+            finally:
+                self.sequence_active = False
+                self.sequence_running = False
+                self.typing_automatically = False
+                self.after(3000, lambda: self.footer_hint.configure(
+                    text=f"💡 Pressione {self.trigger_key_str} para avançar", 
+                    text_color=self.color_main
+                ))
+        
+        import threading
+        thread = threading.Thread(target=sequence_thread, daemon=True)
+        thread.start()
+
+    def _update_semi_auto_entry(self, num):
+        try:
+            self.semi_auto_start_entry.delete(0, "end")
+            self.semi_auto_start_entry.insert(0, str(num))
+            self.config_manager.set("semi_auto", "start_num", num)
+        except:
             pass
 
 if __name__ == "__main__":
