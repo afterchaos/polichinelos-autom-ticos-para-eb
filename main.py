@@ -11,7 +11,7 @@ from auto_typer import AutoTyper
 from updater import run_auto_update
 
 # Configurações do Aplicativo
-APP_VERSION = "2.5.2"
+APP_VERSION = "2.5.3"
 REPO_OWNER = "afterchaos"
 REPO_NAME = "polichinelos-autom-ticos-para-eb"
 EXECUTABLE_NAME = "AutoJJS.exe"
@@ -388,7 +388,7 @@ class AutoJJSApp(ctk.CTk):
         content2 = ctk.CTkFrame(card2, fg_color="transparent")
         content2.pack(fill="x", padx=20, pady=15)
 
-        label2 = ctk.CTkLabel(content2, text="🔢 Limites da Sequência:", font=("Segoe UI Bold", 12))
+        label2 = ctk.CTkLabel(content2, text="🔢 Limites dos JJ's:", font=("Segoe UI Bold", 12))
         label2.pack(anchor="w", pady=(0, 10))
 
         limits_frame = ctk.CTkFrame(content2, fg_color="transparent")
@@ -539,7 +539,7 @@ class AutoJJSApp(ctk.CTk):
         content2 = ctk.CTkFrame(card2, fg_color="transparent")
         content2.pack(fill="x", padx=20, pady=15)
 
-        label2 = ctk.CTkLabel(content2, text="🔢 Limites da Sequência:", font=("Segoe UI Bold", 12))
+        label2 = ctk.CTkLabel(content2, text="🔢 Limites dos JJ's:", font=("Segoe UI Bold", 12))
         label2.pack(anchor="w", pady=(0, 10))
 
         limits_frame = ctk.CTkFrame(content2, fg_color="transparent")
