@@ -127,8 +127,15 @@ del "%~f0" & exit
         with open(batch_path, "w") as f:
             f.write(batch_content)
 
+        # Limpa variáveis de ambiente do PyInstaller para que o novo .exe não tente usar a pasta antiga
+        env = os.environ.copy()
+        env.pop('_MEIPASS2', None)
+        env.pop('TCL_LIBRARY', None)
+        env.pop('TK_LIBRARY', None)
+
         # Executa o script .bat em segundo plano e encerra o app atual
         subprocess.Popen(["cmd.exe", "/c", batch_path], 
+                         env=env,
                          creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0)
         sys.exit(0)
 
