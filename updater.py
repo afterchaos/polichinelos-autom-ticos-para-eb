@@ -5,7 +5,8 @@ import subprocess
 import tempfile
 import time
 from packaging.version import parse as parse_version
-from tkinter import messagebox, Tk
+from tkinter import messagebox, Tk, Toplevel, Label
+from tkinter.ttk import Progressbar
 
 class Updater:
     def __init__(self, repo_owner, repo_name, current_version, executable_name):
@@ -68,15 +69,52 @@ class Updater:
             temp_dir = tempfile.gettempdir()
             new_exe_path = os.path.join(temp_dir, "update_new.exe")
             
+            # Janela de progresso
+            progress_window = Toplevel(root)
+            progress_window.title("Atualizando...")
+            progress_window.geometry("300x120")
+            progress_window.resizable(False, False)
+            progress_window.attributes("-topmost", True)
+            
+            # Centralizar na tela
+            progress_window.update_idletasks()
+            x = (progress_window.winfo_screenwidth() // 2) - (300 // 2)
+            y = (progress_window.winfo_screenheight() // 2) - (120 // 2)
+            progress_window.geometry(f"+{x}+{y}")
+            
+            lbl_status = Label(progress_window, text="Iniciando download...", font=("Arial", 10))
+            lbl_status.pack(pady=(15, 5))
+            
+            progress = Progressbar(progress_window, orient="horizontal", length=250, mode="determinate")
+            progress.pack(pady=10)
+            
+            root.update()
+            
             # Download via requests com stream
             response = requests.get(download_url, headers=self.headers, stream=True)
             response.raise_for_status()
+            
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded = 0
             
             # Tentar baixar e salvar
             with open(new_exe_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
+                        downloaded += len(chunk)
+                        if total_size > 0:
+                            percent = int((downloaded / total_size) * 100)
+                            progress["value"] = percent
+                            lbl_status.config(text=f"Baixando atualização ({percent}%)...")
+                        else:
+                            lbl_status.config(text=f"Baixando atualização ({downloaded // 1024} KB)...")
+                        
+                        root.update()
+
+            lbl_status.config(text="Download concluído! Preparando...")
+            root.update()
+            time.sleep(1)
 
             self._apply_update(new_exe_path)
             root.destroy()
