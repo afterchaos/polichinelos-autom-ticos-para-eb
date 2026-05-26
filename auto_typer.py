@@ -42,12 +42,12 @@ class AutoTyper:
         time.sleep(0.1)
 
     def check_message_sent(self):
-        """Verifica se a caixa de texto ficou vazia após o envio"""
-        sentinel = f"SENTINEL_{random.randint(1000, 9999)}"
+        """Verifica se a mensagem foi enviada e se a caixa de texto ainda existe"""
+        sentinel = f"SNT_{random.randint(1000, 9999)}"
         pyperclip.copy(sentinel)
         time.sleep(0.1)
         
-        # Tenta selecionar tudo e copiar
+        # 1. Tenta selecionar e copiar o que estiver na caixa
         with self.keyboard_controller.pressed(Key.ctrl):
             self.keyboard_controller.press('a')
             self.keyboard_controller.release('a')
@@ -63,31 +63,49 @@ class AutoTyper:
         if content != sentinel and content.strip() != "":
             return False
             
-        return True
+        # 2. Se o conteúdo for igual ao sentinel, pode ser que a caixa esteja vazia
+        # OU que a caixa tenha desaparecido. Vamos validar a existência da caixa.
+        # Digita um espaço curto como "prova de vida"
+        marker = " "
+        self.keyboard_controller.type(marker)
+        time.sleep(0.05)
+        
+        with self.keyboard_controller.pressed(Key.ctrl):
+            self.keyboard_controller.press('a')
+            self.keyboard_controller.release('a')
+            time.sleep(0.05)
+            self.keyboard_controller.press('c')
+            self.keyboard_controller.release('c')
+            
+        time.sleep(0.1)
+        res = pyperclip.paste()
+        
+        # Se o clipboard ainda for o sentinel, a caixa sumiu!
+        if res == sentinel:
+            return False
+            
+        # Se for o marcador, a caixa existe. Limpa o marcador e retorna sucesso.
+        if res == marker:
+            self.keyboard_controller.press(Key.backspace)
+            self.keyboard_controller.release(Key.backspace)
+            return True
+            
+        return False
 
     def verify_textbox_exists(self):
-        """Verifica se o campo de texto está presente de forma silenciosa e confiável"""
+        """Verifica se o campo de texto está presente de forma rápida e confiável"""
         if not self.is_discord_active():
             return False
             
         old_clip = pyperclip.paste()
-        marker = "VLD" # Marcador curto
-        pyperclip.copy("EMPTY_VALIDATION")
+        marker = f"V_{random.randint(10, 99)}"
+        pyperclip.copy("VOID")
         
-        # 1. Limpa qualquer texto existente antes do teste
-        with self.keyboard_controller.pressed(Key.ctrl):
-            self.keyboard_controller.press('a')
-            self.keyboard_controller.release('a')
-        time.sleep(0.05)
-        self.keyboard_controller.press(Key.backspace)
-        self.keyboard_controller.release(Key.backspace)
-        time.sleep(0.05)
-        
-        # 2. Digita o marcador
+        # 1. Digita o marcador
         self.keyboard_controller.type(marker)
-        time.sleep(0.1)
+        time.sleep(0.05)
         
-        # 3. Tenta selecionar e copiar o marcador
+        # 2. Tenta selecionar e copiar o marcador
         with self.keyboard_controller.pressed(Key.ctrl):
             self.keyboard_controller.press('a')
             self.keyboard_controller.release('a')
@@ -98,16 +116,14 @@ class AutoTyper:
         time.sleep(0.1)
         res = pyperclip.paste()
         
-        # 4. Apaga o marcador obrigatoriamente (usando Ctrl+A para garantir)
-        with self.keyboard_controller.pressed(Key.ctrl):
-            self.keyboard_controller.press('a')
-            self.keyboard_controller.release('a')
-        time.sleep(0.05)
-        self.keyboard_controller.press(Key.backspace)
-        self.keyboard_controller.release(Key.backspace)
+        # 3. Limpa obrigatoriamente o marcador completo
+        for _ in range(len(marker)):
+            self.keyboard_controller.press(Key.backspace)
+            self.keyboard_controller.release(Key.backspace)
+            time.sleep(0.01)
         
         success = (res == marker)
-        pyperclip.copy(old_clip) # Restaura o clipboard do usuário
+        pyperclip.copy(old_clip)
         return success
 
     def type_with_protections(self, text, delay_ms=50, auto_send_enter=True, random_extra=True):

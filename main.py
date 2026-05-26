@@ -11,10 +11,11 @@ from auto_typer import AutoTyper
 from updater import run_auto_update
 
 # Configurações do Aplicativo
-APP_VERSION = "2.5.3"
+APP_VERSION = "3.0.0"
 REPO_OWNER = "afterchaos"
 REPO_NAME = "polichinelos-autom-ticos-para-eb"
 EXECUTABLE_NAME = "AutoJJS.exe"
+
 
 # Configurações do CustomTkinter
 ctk.set_appearance_mode("dark")
@@ -80,6 +81,19 @@ class AutoJJSApp(ctk.CTk):
         self.semi_auto_skip_space = self.config_manager.get("semi_auto", "auto_skip_space", True)
         self.listening_for_semi_auto_key = False
         self.listening_for_semi_auto_prefix = False
+
+        # Variáveis - JJS Tab
+        self.jjs_enabled = self.config_manager.get("jjs", "enabled", False)
+        self.jjs_hotkey_str = self.config_manager.get("jjs", "hotkey", "f7").lower()
+        self.jjs_hotkey_obj = self._parse_key_string(self.jjs_hotkey_str)
+        self.jjs_delay_ms = self.config_manager.get("jjs", "delay_ms", 50)
+        self.jjs_word1 = self.config_manager.get("jjs", "word1", "SENTINELA")
+        self.jjs_word2 = self.config_manager.get("jjs", "word2", "AGUARDANDO")
+        self.jjs_start_num = self.config_manager.get("jjs", "start_num", 1)
+        self.jjs_end_num = self.config_manager.get("jjs", "end_num", 10000)
+        self.jjs_contador = self.jjs_start_num
+        self.jjs_auto_send_enter = self.config_manager.get("jjs", "auto_send_enter", True)
+        self.listening_for_jjs_key = False
 
         # Cores Customizáveis
         self.color_main = "#7289da"
@@ -198,6 +212,10 @@ class AutoJJSApp(ctk.CTk):
             # Permite clicar nos campos de entrada da aba Semi Auto
             if event.widget == self.semi_auto_start_entry._entry or event.widget == self.semi_auto_end_entry._entry:
                 return
+
+            # Permite clicar nos campos de entrada da aba JJS
+            if hasattr(self, 'jjs_start_entry') and (event.widget == self.jjs_start_entry._entry or event.widget == self.jjs_end_entry._entry or event.widget == self.jjs_word1_entry._entry or event.widget == self.jjs_word2_entry._entry):
+                return
                 
             # Remove foco de outros widgets
             self.focus()
@@ -235,9 +253,13 @@ class AutoJJSApp(ctk.CTk):
         # Aba 3: Configuração de Semi Auto
         self.tab_semi = self.tabview.add("⚡ AFK-JOGO")
         
+        # Aba 4: Configuração de JJS
+        self.tab_jjs = self.tabview.add("🤖 JJS")
+        
         self.setup_main_tab()
         self.setup_config_tab()
         self.setup_semi_auto_tab()
+        self.setup_jjs_tab()
 
 
     def setup_main_tab(self):
@@ -662,6 +684,183 @@ class AutoJJSApp(ctk.CTk):
         except:
             pass
 
+    def setup_jjs_tab(self):
+        # Frame principal com rolagem
+        self.jjs_scroll = ctk.CTkScrollableFrame(self.tab_jjs, fg_color="transparent")
+        self.jjs_scroll.pack(fill="both", expand=True)
+
+        # Title
+        title = ctk.CTkLabel(self.jjs_scroll, text="🤖 Configuração JJS", 
+                            font=("Segoe UI Bold", 24), text_color=self.color_main)
+        title.pack(pady=(20, 10), anchor="w", padx=20)
+
+        subtitle = ctk.CTkLabel(self.jjs_scroll, text="Modo Sequencial: Número -> Palavra 1 -> Palavra 2",
+                               font=("Segoe UI", 12), text_color="gray")
+        subtitle.pack(anchor="w", padx=20, pady=(0, 20))
+
+        # Main Frame
+        main_frame = ctk.CTkFrame(self.jjs_scroll, fg_color="transparent")
+        main_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Card 1: Ativar/Desativar
+        card1 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card1.pack(fill="x", pady=(0, 15))
+
+        header1 = ctk.CTkFrame(card1, fg_color="transparent")
+        header1.pack(fill="x", padx=20, pady=15)
+
+        label1 = ctk.CTkLabel(header1, text="🤖 Modo JJS", font=("Segoe UI Bold", 14))
+        label1.pack(side="left", anchor="w")
+
+        self.jjs_toggle = ctk.CTkSwitch(header1, text="", onvalue=True, offvalue=False,
+                                             command=self.toggle_jjs_mode)
+        self.jjs_toggle.pack(side="right")
+        self.jjs_toggle.select() if self.jjs_enabled else self.jjs_toggle.deselect()
+
+        # Card 2: Configurar Limites
+        card2 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card2.pack(fill="x", pady=(0, 15))
+
+        content2 = ctk.CTkFrame(card2, fg_color="transparent")
+        content2.pack(fill="x", padx=20, pady=15)
+
+        label2 = ctk.CTkLabel(content2, text="🔢 Limites dos JJ's:", font=("Segoe UI Bold", 12))
+        label2.pack(anchor="w", pady=(0, 10))
+
+        limits_frame = ctk.CTkFrame(content2, fg_color="transparent")
+        limits_frame.pack(fill="x", pady=(0, 10))
+
+        start_label = ctk.CTkLabel(limits_frame, text="Início:", font=("Segoe UI Bold", 11))
+        start_label.pack(side="left", padx=(0, 5))
+        self.jjs_start_entry = ctk.CTkEntry(limits_frame, width=70)
+        self.jjs_start_entry.insert(0, str(self.jjs_start_num))
+        self.jjs_start_entry.pack(side="left", padx=(0, 10))
+
+        end_label = ctk.CTkLabel(limits_frame, text="Fim:", font=("Segoe UI Bold", 11))
+        end_label.pack(side="left", padx=(0, 5))
+        self.jjs_end_entry = ctk.CTkEntry(limits_frame, width=70)
+        self.jjs_end_entry.insert(0, str(self.jjs_end_num))
+        self.jjs_end_entry.pack(side="left", padx=(0, 10))
+
+        apply_limits_btn = ctk.CTkButton(limits_frame, text="APLICAR", width=80, fg_color=self.color_btn_primary, 
+                                        hover_color=self.color_btn_primary, font=("Segoe UI Bold", 10), 
+                                        command=self.apply_jjs_limits)
+        apply_limits_btn.pack(side="left", padx=(0, 10))
+
+        # Card 3: Palavras Customizadas
+        card3 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card3.pack(fill="x", pady=(0, 15))
+
+        content3 = ctk.CTkFrame(card3, fg_color="transparent")
+        content3.pack(fill="x", padx=20, pady=15)
+
+        label3 = ctk.CTkLabel(content3, text="📝 Palavras da Sequência:", font=("Segoe UI Bold", 12))
+        label3.pack(anchor="w", pady=(0, 10))
+
+        words_frame = ctk.CTkFrame(content3, fg_color="transparent")
+        words_frame.pack(fill="x")
+
+        word1_label = ctk.CTkLabel(words_frame, text="Palavra 1:", font=("Segoe UI Bold", 11))
+        word1_label.pack(anchor="w")
+        self.jjs_word1_entry = ctk.CTkEntry(words_frame, placeholder_text="Ex: SENTINELA")
+        self.jjs_word1_entry.insert(0, self.jjs_word1)
+        self.jjs_word1_entry.pack(fill="x", pady=(0, 10))
+
+        word2_label = ctk.CTkLabel(words_frame, text="Palavra 2 (Sua escolha):", font=("Segoe UI Bold", 11))
+        word2_label.pack(anchor="w")
+        self.jjs_word2_entry = ctk.CTkEntry(words_frame, placeholder_text="Ex: AGUARDANDO")
+        self.jjs_word2_entry.insert(0, self.jjs_word2)
+        self.jjs_word2_entry.pack(fill="x", pady=(0, 10))
+
+        apply_words_btn = ctk.CTkButton(words_frame, text="SALVAR PALAVRAS", fg_color=self.color_btn_primary, 
+                                        hover_color=self.color_btn_primary, font=("Segoe UI Bold", 10), 
+                                        command=self.apply_jjs_words)
+        apply_words_btn.pack(fill="x")
+
+        # Card 4: Configurar Hotkey
+        card4 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card4.pack(fill="x", pady=(0, 15))
+
+        content4 = ctk.CTkFrame(card4, fg_color="transparent")
+        content4.pack(fill="x", padx=20, pady=15)
+
+        label4 = ctk.CTkLabel(content4, text="⌨️ Tecla de Ativação:", font=("Segoe UI Bold", 12))
+        label4.pack(anchor="w", pady=(0, 10))
+
+        self.jjs_hotkey_btn = ctk.CTkButton(content4, text=self.jjs_hotkey_str.upper(),
+                                                  width=100, command=self.start_jjs_key_capture,
+                                                  font=("Segoe UI Bold", 11))
+        self.jjs_hotkey_btn.pack(anchor="w")
+
+        # Card 5: Delay e Opções
+        card5 = ctk.CTkFrame(main_frame, corner_radius=10, fg_color=self.color_card_bg)
+        card5.pack(fill="x", pady=(0, 15))
+
+        content5 = ctk.CTkFrame(card5, fg_color="transparent")
+        content5.pack(fill="x", padx=20, pady=15)
+
+        label_delay = ctk.CTkLabel(content5, text="⏱️ Tempo por Letra (ms):", font=("Segoe UI Bold", 12))
+        label_delay.pack(anchor="w", pady=(0, 10))
+
+        slider_frame = ctk.CTkFrame(content5, fg_color="transparent")
+        slider_frame.pack(fill="x", pady=(0, 10))
+
+        self.jjs_delay_slider = ctk.CTkSlider(slider_frame, from_=10, to=500, number_of_steps=49,
+                                          command=self.update_jjs_delay_value)
+        self.jjs_delay_slider.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.jjs_delay_slider.set(self.jjs_delay_ms)
+
+        self.jjs_delay_value_label = ctk.CTkLabel(slider_frame, text=f"{self.jjs_delay_ms}ms",
+                                             font=("Segoe UI Bold", 11), width=60, text_color=self.color_main)
+        self.jjs_delay_value_label.pack(side="left")
+
+        # Switches Frame
+        switches_frame = ctk.CTkFrame(content5, fg_color="transparent")
+        switches_frame.pack(fill="x", pady=(10, 0))
+
+        enter_label = ctk.CTkLabel(switches_frame, text="📤 Enviar (Enter)", font=("Segoe UI Bold", 12))
+        enter_label.pack(side="left", anchor="w")
+
+        self.jjs_enter_toggle = ctk.CTkSwitch(switches_frame, text="", onvalue=True, offvalue=False,
+                                              command=self.toggle_jjs_send_enter)
+        self.jjs_enter_toggle.pack(side="left", padx=(10, 20))
+        self.jjs_enter_toggle.select() if self.jjs_auto_send_enter else self.jjs_enter_toggle.deselect()
+
+    def toggle_jjs_mode(self):
+        self.jjs_enabled = self.jjs_toggle.get()
+        self.config_manager.set("jjs", "enabled", self.jjs_enabled)
+
+    def start_jjs_key_capture(self):
+        self.listening_for_jjs_key = True
+        self.jjs_hotkey_btn.configure(text="AGUARDANDO...")
+
+    def update_jjs_delay_value(self, value):
+        self.jjs_delay_ms = int(float(value))
+        self.jjs_delay_value_label.configure(text=f"{self.jjs_delay_ms}ms")
+        self.config_manager.set("jjs", "delay_ms", self.jjs_delay_ms)
+
+    def toggle_jjs_send_enter(self):
+        self.jjs_auto_send_enter = self.jjs_enter_toggle.get()
+        self.config_manager.set("jjs", "auto_send_enter", self.jjs_auto_send_enter)
+
+    def apply_jjs_limits(self):
+        try:
+            self.jjs_start_num = int(self.jjs_start_entry.get())
+            self.jjs_end_num = int(self.jjs_end_entry.get())
+            self.jjs_contador = self.jjs_start_num
+            self.config_manager.set("jjs", "start_num", self.jjs_start_num)
+            self.config_manager.set("jjs", "end_num", self.jjs_end_num)
+            self.focus()
+        except:
+            pass
+
+    def apply_jjs_words(self):
+        self.jjs_word1 = self.jjs_word1_entry.get().upper()
+        self.jjs_word2 = self.jjs_word2_entry.get().upper()
+        self.config_manager.set("jjs", "word1", self.jjs_word1)
+        self.config_manager.set("jjs", "word2", self.jjs_word2)
+        self.focus()
+
     def prev_number(self):
         if self.contador > self.start_num:
             self.contador -= 1
@@ -905,9 +1104,27 @@ class AutoJJSApp(ctk.CTk):
                         self.sequence_active = True
                         self.after(0, self.start_semi_auto_sequence, self.semi_auto_start_num, has_char)
                     return
-            
+
+            # Verifica se é a hotkey do JJS
+            is_jjs_hotkey = self.jjs_enabled and self._is_key_pressed(key, self.jjs_hotkey_obj)
+
+            if is_jjs_hotkey:
+                if self.is_typing_char:
+                    return
+
+                if current_time - self.last_hotkey_time > 0.2:
+                    self.last_hotkey_time = current_time
+
+                    if self.sequence_active:
+                        self.sequence_active = False
+                    else:
+                        has_char = hasattr(key, 'char') and key.char
+                        self.sequence_active = True
+                        self.after(0, self.start_jjs_sequence, self.jjs_start_num, has_char)
+                    return
+
             # Se o programa está digitando outros caracteres, ignoramos o resto do listener
-            if self.typing_automatically and not is_auto_type_hotkey and not is_semi_auto_hotkey:
+            if self.typing_automatically and not is_auto_type_hotkey and not is_semi_auto_hotkey and not is_jjs_hotkey:
                 return
 
             # 1. Verifica se está capturando teclas para configuração
@@ -949,6 +1166,22 @@ class AutoJJSApp(ctk.CTk):
                 self.listening_for_semi_auto_prefix = False
                 self.config_manager.set("semi_auto", "prefix_key", char)
                 self.after(0, lambda: self.semi_auto_prefix_btn.configure(text=char.upper()))
+                return
+
+            if self.listening_for_jjs_key:
+                self.jjs_hotkey_obj = key
+                self.jjs_hotkey_str = self.format_key_name(key).lower()
+                self.listening_for_jjs_key = False
+                # Habilita o modo JJS automaticamente ao escolher a tecla
+                self.jjs_enabled = True
+                try:
+                    self.jjs_toggle.select()
+                except:
+                    pass
+                self.config_manager.set("jjs", "hotkey", self.jjs_hotkey_str)
+                self.config_manager.set("jjs", "enabled", True)
+                self.after(0, lambda: self.jjs_hotkey_btn.configure(text=self.jjs_hotkey_str.upper()))
+                self.after(0, lambda: self.footer_hint.configure(text=f"💡 Pressione {self.jjs_hotkey_str.upper()} para ativar JJS", text_color=self.color_main))
                 return
 
             # Se algum campo de entrada estiver em foco, ignoramos hotkeys normais (caracteres)
@@ -1040,10 +1273,15 @@ class AutoJJSApp(ctk.CTk):
                 current_num = start_num
                 # Inicia a sequência enquanto habilitada e ativa
                 while self.auto_type_enabled and self.sequence_active:
-                    # 0. Verifica se Discord está ativo
+                    # 0. Verifica se Discord está ativo e se a caixa de texto existe
                     if not self.auto_typer.is_discord_active():
                         self.sequence_active = False
                         self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
+                        break
+
+                    if not self.auto_typer.verify_textbox_exists():
+                        self.sequence_active = False
+                        self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Campo de texto não encontrado", text_color=self.color_btn_danger))
                         break
 
                     text = self.numero_para_extenso(current_num)
@@ -1078,7 +1316,7 @@ class AutoJJSApp(ctk.CTk):
                             self.sequence_active = False
                             # Limpa a caixa para não bugar o próximo envio
                             self.auto_typer.clear_textbox()
-                            self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Falha no envio (Castigo/Slow)", text_color=self.color_btn_danger))
+                            self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Falha no envio (Castigo/Slow/Interface)", text_color=self.color_btn_danger))
                             break
                     
                     # Desmarca para permitir toggle
@@ -1247,6 +1485,125 @@ class AutoJJSApp(ctk.CTk):
         import threading
         thread = threading.Thread(target=sequence_thread, daemon=True)
         thread.start()
+
+    def _update_jjs_entry(self, num):
+        try:
+            self.jjs_start_entry.delete(0, "end")
+            self.jjs_start_entry.insert(0, str(num))
+            self.config_manager.set("jjs", "start_num", num)
+        except:
+            pass
+
+    def start_jjs_sequence(self, start_num=1, needs_backspace=False):
+        """Inicia a digitação automática JJS: Número -> Palavra 1 -> Palavra 2"""
+        if hasattr(self, 'sequence_running') and self.sequence_running:
+            return
+
+        jjs_start = self.jjs_start_num
+        jjs_end = self.jjs_end_num
+        
+        if start_num < jjs_start:
+            start_num = jjs_start
+        elif start_num > jjs_end:
+            start_num = jjs_start
+        
+        def sequence_thread():
+            self.sequence_running = True
+            try:
+                self.after(0, lambda: self.footer_hint.configure(text="🤖 JJS ATIVO: Pressione hotkey para parar", text_color=self.color_main))
+                
+                if needs_backspace:
+                    self.is_typing_char = True
+                    self.keyboard_controller.press(keyboard.Key.backspace)
+                    self.keyboard_controller.release(keyboard.Key.backspace)
+                    time.sleep(0.05)
+                    self.is_typing_char = False
+
+                if not self.auto_typer.is_discord_active():
+                    self.sequence_active = False
+                    self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
+                    return
+
+                # Garante que a caixa de texto esteja limpa antes da sequência JJS
+                self.auto_typer.clear_textbox()
+                time.sleep(0.1)
+
+                current_num = start_num
+                while self.jjs_enabled and self.sequence_active:
+                    # 1. Enviar o Número por extenso
+                    text_num = self.numero_para_extenso(current_num)
+                    if self.exclamation_format == "junta":
+                        text_num += "!"
+                    else:
+                        text_num += " !"
+                    
+                    if not self._jjs_type_and_send(text_num): break
+                    
+                    # 2. Enviar Palavra 1
+                    if not self._jjs_type_and_send(self.jjs_word1): break
+                    
+                    # 3. Enviar Palavra 2
+                    if not self._jjs_type_and_send(self.jjs_word2): break
+                    
+                    current_num += 1
+                    self.jjs_contador = current_num
+                    self.jjs_start_num = current_num
+                    self.after(0, self._update_jjs_entry, current_num)
+                    
+                    if current_num > jjs_end:
+                        self.sequence_active = False
+                        break
+                        
+            except Exception as e:
+                print(f"Erro na sequência JJS: {e}")
+            finally:
+                self.sequence_active = False
+                self.sequence_running = False
+                self.typing_automatically = False
+                self.after(3000, lambda: self.footer_hint.configure(
+                    text=f"💡 Pressione {self.trigger_key_str} para avançar", 
+                    text_color=self.color_main
+                ))
+        
+        import threading
+        thread = threading.Thread(target=sequence_thread, daemon=True)
+        thread.start()
+
+    def _jjs_type_and_send(self, text):
+        """Método auxiliar para digitar e enviar com proteções"""
+        if not self.sequence_active: return False
+        
+        # Verifica Discord
+        if not self.auto_typer.is_discord_active():
+            self.sequence_active = False
+            self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
+            return False
+
+        # Limpa o campo antes de digitar para evitar marcadores residuais
+        self.auto_typer.clear_textbox()
+        time.sleep(0.1)
+
+        self.typing_automatically = True
+        
+        # Digita
+        for char in text:
+            if not self.sequence_active: break
+            self.is_typing_char = True
+            self.keyboard_controller.type(char)
+            self.is_typing_char = False
+            time.sleep(self.jjs_delay_ms / 1000.0)
+        
+        # Envia Enter
+        if self.jjs_auto_send_enter and self.sequence_active:
+            self.is_typing_char = True
+            self.keyboard_controller.press(keyboard.Key.enter)
+            self.keyboard_controller.release(keyboard.Key.enter)
+            self.is_typing_char = False
+            
+            time.sleep(0.3)
+
+        self.typing_automatically = False
+        return True
 
     def _update_semi_auto_entry(self, num):
         try:
