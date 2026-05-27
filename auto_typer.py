@@ -199,6 +199,10 @@ class AutoTyper:
         thread = threading.Thread(target=typing_thread, daemon=True)
         thread.start()
 
+    def type_with_delay(self, text, delay_ms=50, auto_send_enter=True):
+        """Helper compatível com o fluxo de auto-typing."""
+        self.type_with_protections(text, delay_ms, auto_send_enter, random_extra=False)
+
     def pause_and_notify(self, reason):
         self.is_typing = False
         print(f"PAUSE: {reason}")

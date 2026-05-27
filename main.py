@@ -11,7 +11,7 @@ from auto_typer import AutoTyper
 from updater import run_auto_update
 
 # Configurações do Aplicativo
-APP_VERSION = "3.0.0"
+APP_VERSION = "3.0.1"
 REPO_OWNER = "afterchaos"
 REPO_NAME = "polichinelos-autom-ticos-para-eb"
 EXECUTABLE_NAME = "AutoJJS.exe"
@@ -1271,18 +1271,17 @@ class AutoJJSApp(ctk.CTk):
                     self.is_typing_char = False
 
                 current_num = start_num
+                local_fail_count = 0
                 # Inicia a sequência enquanto habilitada e ativa
                 while self.auto_type_enabled and self.sequence_active:
-                    # 0. Verifica se Discord está ativo e se a caixa de texto existe
                     if not self.auto_typer.is_discord_active():
                         self.sequence_active = False
                         self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
                         break
 
-                    if not self.auto_typer.verify_textbox_exists():
-                        self.sequence_active = False
-                        self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Campo de texto não encontrado", text_color=self.color_btn_danger))
-                        break
+                    # Limpa o campo de texto antes de digitar para evitar marcadores residuais
+                    self.auto_typer.clear_textbox()
+                    time.sleep(0.1)
 
                     text = self.numero_para_extenso(current_num)
                     if self.exclamation_format == "junta":
@@ -1309,15 +1308,12 @@ class AutoJJSApp(ctk.CTk):
                         self.keyboard_controller.release(keyboard.Key.enter)
                         self.is_typing_char = False
                         
-                        # VERIFICAÇÃO DE SUCESSO: Se o texto ainda estiver na caixa, paramos na hora.
-                        # Isso detecta Castigo (Timeout), Slow mode ou falta de campo de texto.
-                        time.sleep(0.25) 
+                        time.sleep(0.25)
                         if not self.auto_typer.check_message_sent():
-                            self.sequence_active = False
-                            # Limpa a caixa para não bugar o próximo envio
                             self.auto_typer.clear_textbox()
-                            self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Falha no envio (Castigo/Slow/Interface)", text_color=self.color_btn_danger))
-                            break
+                            self.after(0, lambda: self.footer_hint.configure(text="⚠️ Aviso: mensagem não confirmada, continuando...", text_color="#ffcc00"))
+                        else:
+                            local_fail_count = 0
                     
                     # Desmarca para permitir toggle
                     self.typing_automatically = False
