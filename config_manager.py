@@ -50,6 +50,7 @@ class ConfigManager:
                 "delay_ms": 50,
                 "word1": "SENTINELA",
                 "word2": "AGUARDANDO",
+                "sequence_order": "number_first",
                 "start_num": 1,
                 "end_num": 10000,
                 "auto_send_enter": True

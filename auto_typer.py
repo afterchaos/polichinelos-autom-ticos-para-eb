@@ -42,89 +42,77 @@ class AutoTyper:
         time.sleep(0.1)
 
     def check_message_sent(self):
-        """Verifica se a mensagem foi enviada e se a caixa de texto ainda existe"""
-        sentinel = f"SNT_{random.randint(1000, 9999)}"
-        pyperclip.copy(sentinel)
-        time.sleep(0.1)
-        
-        # 1. Tenta selecionar e copiar o que estiver na caixa
-        with self.keyboard_controller.pressed(Key.ctrl):
-            self.keyboard_controller.press('a')
-            self.keyboard_controller.release('a')
-            time.sleep(0.05)
-            self.keyboard_controller.press('c')
-            self.keyboard_controller.release('c')
-        
-        time.sleep(0.1)
-        content = pyperclip.paste()
-        
-        # Se o conteúdo for diferente do sentinel e não estiver vazio, 
-        # significa que a mensagem ainda está na caixa (falha no envio/timeout)
-        if content != sentinel and content.strip() != "":
+        """Verifica se a caixa está vazia após enviar mensagem"""
+        try:
+            time.sleep(0.25)  # Espera mais tempo pro Discord processar e limpar a caixa
+            
+            # Apenas seleciona tudo e tenta copiar
+            with self.keyboard_controller.pressed(Key.ctrl):
+                self.keyboard_controller.press('a')
+                self.keyboard_controller.release('a')
+                time.sleep(0.03)
+                self.keyboard_controller.press('c')
+                self.keyboard_controller.release('c')
+            
+            time.sleep(0.1)
+            
+            # Lê o conteúdo da caixa
+            clipboard_content = pyperclip.paste().strip()
+            
+            # Se está vazio = mensagem foi enviada com sucesso!
+            if clipboard_content == "":
+                return True
+            
+            # Se tem conteúdo = mensagem não foi enviada
             return False
             
-        # 2. Se o conteúdo for igual ao sentinel, pode ser que a caixa esteja vazia
-        # OU que a caixa tenha desaparecido. Vamos validar a existência da caixa.
-        # Digita um espaço curto como "prova de vida"
-        marker = " "
-        self.keyboard_controller.type(marker)
-        time.sleep(0.05)
-        
-        with self.keyboard_controller.pressed(Key.ctrl):
-            self.keyboard_controller.press('a')
-            self.keyboard_controller.release('a')
-            time.sleep(0.05)
-            self.keyboard_controller.press('c')
-            self.keyboard_controller.release('c')
-            
-        time.sleep(0.1)
-        res = pyperclip.paste()
-        
-        # Se o clipboard ainda for o sentinel, a caixa sumiu!
-        if res == sentinel:
-            return False
-            
-        # Se for o marcador, a caixa existe. Limpa o marcador e retorna sucesso.
-        if res == marker:
-            self.keyboard_controller.press(Key.backspace)
-            self.keyboard_controller.release(Key.backspace)
+        except Exception as e:
+            print(f"Erro ao verificar envio: {e}")
+            # Em caso de erro, assume sucesso
             return True
-            
-        return False
 
     def verify_textbox_exists(self):
         """Verifica se o campo de texto está presente de forma rápida e confiável"""
         if not self.is_discord_active():
             return False
-            
+
         old_clip = pyperclip.paste()
         marker = f"V_{random.randint(10, 99)}"
         pyperclip.copy("VOID")
-        
-        # 1. Digita o marcador
-        self.keyboard_controller.type(marker)
-        time.sleep(0.05)
-        
-        # 2. Tenta selecionar e copiar o marcador
-        with self.keyboard_controller.pressed(Key.ctrl):
-            self.keyboard_controller.press('a')
-            self.keyboard_controller.release('a')
+
+        try:
+            # 1. Digita o marcador
+            self.keyboard_controller.type(marker)
             time.sleep(0.05)
-            self.keyboard_controller.press('c')
-            self.keyboard_controller.release('c')
-        
-        time.sleep(0.1)
-        res = pyperclip.paste()
-        
-        # 3. Limpa obrigatoriamente o marcador completo
-        for _ in range(len(marker)):
-            self.keyboard_controller.press(Key.backspace)
-            self.keyboard_controller.release(Key.backspace)
-            time.sleep(0.01)
-        
-        success = (res == marker)
-        pyperclip.copy(old_clip)
-        return success
+
+            # 2. Tenta selecionar e copiar o marcador
+            with self.keyboard_controller.pressed(Key.ctrl):
+                self.keyboard_controller.press('a')
+                self.keyboard_controller.release('a')
+                time.sleep(0.05)
+                self.keyboard_controller.press('c')
+                self.keyboard_controller.release('c')
+
+            time.sleep(0.1)
+            res = pyperclip.paste()
+
+            # 3. Limpa obrigatoriamente o marcador completo
+            for _ in range(len(marker)):
+                self.keyboard_controller.press(Key.backspace)
+                self.keyboard_controller.release(Key.backspace)
+                time.sleep(0.01)
+
+            success = (res == marker)
+            return success
+        finally:
+            pyperclip.copy(old_clip)
+
+    def has_editable_textbox(self):
+        """Retorna True quando o Discord ainda está com um campo de texto livre e utilizável."""
+        try:
+            return self.is_discord_active() and self.verify_textbox_exists()
+        except Exception:
+            return False
 
     def type_with_protections(self, text, delay_ms=50, auto_send_enter=True, random_extra=True):
         if self.is_typing:

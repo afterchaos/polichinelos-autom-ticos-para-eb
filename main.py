@@ -1,3 +1,4 @@
+import threading
 import customtkinter as ctk
 import pyperclip
 import time
@@ -61,7 +62,11 @@ class AutoJJSApp(ctk.CTk):
         self.number_buffer = ""
         self.last_hotkey_time = 0
         self.sequence_active = False  # Controla se a sequência está ativa
-        self.sequence_running = False # Evita múltiplas threads da mesma sequência
+        self.sequence_running = False  # Compatibilidade geral para sequências
+        self.auto_type_sequence_running = False
+        self.semi_auto_sequence_running = False
+        self.jjs_sequence_running = False
+        self.active_sequence = None
         self.typing_automatically = False  # Controla se o programa está digitando
         self.is_typing_char = False  # Indica se o programa está simulando o pressionamento de uma tecla específica
         
@@ -89,6 +94,7 @@ class AutoJJSApp(ctk.CTk):
         self.jjs_delay_ms = self.config_manager.get("jjs", "delay_ms", 50)
         self.jjs_word1 = self.config_manager.get("jjs", "word1", "SENTINELA")
         self.jjs_word2 = self.config_manager.get("jjs", "word2", "AGUARDANDO")
+        self.jjs_sequence_order = self.config_manager.get("jjs", "sequence_order", "number_first")
         self.jjs_start_num = self.config_manager.get("jjs", "start_num", 1)
         self.jjs_end_num = self.config_manager.get("jjs", "end_num", 10000)
         self.jjs_contador = self.jjs_start_num
@@ -694,9 +700,13 @@ class AutoJJSApp(ctk.CTk):
                             font=("Segoe UI Bold", 24), text_color=self.color_main)
         title.pack(pady=(20, 10), anchor="w", padx=20)
 
-        subtitle = ctk.CTkLabel(self.jjs_scroll, text="Modo Sequencial: Número -> Palavra 1 -> Palavra 2",
-                               font=("Segoe UI", 12), text_color="gray")
-        subtitle.pack(anchor="w", padx=20, pady=(0, 20))
+        self.jjs_sequence_subtitle = ctk.CTkLabel(
+            self.jjs_scroll,
+            text=self._get_jjs_sequence_label(),
+            font=("Segoe UI", 12),
+            text_color="gray"
+        )
+        self.jjs_sequence_subtitle.pack(anchor="w", padx=20, pady=(0, 20))
 
         # Main Frame
         main_frame = ctk.CTkFrame(self.jjs_scroll, fg_color="transparent")
@@ -771,6 +781,17 @@ class AutoJJSApp(ctk.CTk):
         self.jjs_word2_entry = ctk.CTkEntry(words_frame, placeholder_text="Ex: AGUARDANDO")
         self.jjs_word2_entry.insert(0, self.jjs_word2)
         self.jjs_word2_entry.pack(fill="x", pady=(0, 10))
+
+        order_label = ctk.CTkLabel(words_frame, text="📌 Ordem da sequência:", font=("Segoe UI Bold", 11))
+        order_label.pack(anchor="w", pady=(0, 5))
+        self.jjs_order_option = ctk.CTkOptionMenu(
+            words_frame,
+            values=["Número primeiro", "Palavra primeiro"],
+            command=self.set_jjs_sequence_order,
+            width=200
+        )
+        self.jjs_order_option.set(self._get_jjs_sequence_display_name())
+        self.jjs_order_option.pack(fill="x", pady=(0, 10))
 
         apply_words_btn = ctk.CTkButton(words_frame, text="SALVAR PALAVRAS", fg_color=self.color_btn_primary, 
                                         hover_color=self.color_btn_primary, font=("Segoe UI Bold", 10), 
@@ -853,6 +874,31 @@ class AutoJJSApp(ctk.CTk):
             self.focus()
         except:
             pass
+
+    def _get_jjs_sequence_display_name(self):
+        return "Número primeiro" if self.jjs_sequence_order == "number_first" else "Palavra primeiro"
+
+    def _get_jjs_sequence_label(self):
+        if self.jjs_sequence_order == "word_first":
+            return "Modo Sequencial: Palavra 1 -> Palavra 2 -> Número"
+        return "Modo Sequencial: Número -> Palavra 1 -> Palavra 2"
+
+    def set_jjs_sequence_order(self, value):
+        self.jjs_sequence_order = "number_first" if value == "Número primeiro" else "word_first"
+        self.config_manager.set("jjs", "sequence_order", self.jjs_sequence_order)
+        if hasattr(self, 'jjs_sequence_subtitle'):
+            self.jjs_sequence_subtitle.configure(text=self._get_jjs_sequence_label())
+
+    def _build_jjs_sequence(self, current_num):
+        number_text = self.numero_para_extenso(current_num)
+        if self.exclamation_format == "junta":
+            number_text += "!"
+        else:
+            number_text += " !"
+
+        if self.jjs_sequence_order == "word_first":
+            return [self.jjs_word1, self.jjs_word2, number_text]
+        return [number_text, self.jjs_word1, self.jjs_word2]
 
     def apply_jjs_words(self):
         self.jjs_word1 = self.jjs_word1_entry.get().upper()
@@ -1072,17 +1118,28 @@ class AutoJJSApp(ctk.CTk):
                 # Se a tecla foi enviada pelo próprio programa, ignoramos para evitar auto-trigger
                 if self.is_typing_char:
                     return
-                
+
                 # Evita disparos múltiplos rápidos
                 if current_time - self.last_hotkey_time > 0.2:
                     self.last_hotkey_time = current_time
-                    
-                    if self.sequence_active:
+
+                    if self.sequence_active and self.active_sequence == 'auto_type':
                         self.sequence_active = False
+                        self.auto_type_sequence_running = False
+                        self.sequence_running = self.semi_auto_sequence_running or self.jjs_sequence_running
+                        if not self.sequence_running:
+                            self.active_sequence = None
                     else:
+                        self.sequence_active = False
+                        self.auto_type_sequence_running = False
+                        self.semi_auto_sequence_running = False
+                        self.jjs_sequence_running = False
+                        self.sequence_running = False
+                        self.active_sequence = 'auto_type'
+
                         # Verifica se precisa de backspace (se for caractere normal)
                         has_char = hasattr(key, 'char') and key.char
-                        
+
                         self.sequence_active = True
                         self.after(0, self.start_continuous_sequence, self.auto_type_start_num, has_char)
                     return
@@ -1093,13 +1150,24 @@ class AutoJJSApp(ctk.CTk):
             if is_semi_auto_hotkey:
                 if self.is_typing_char:
                     return
-                
+
                 if current_time - self.last_hotkey_time > 0.2:
                     self.last_hotkey_time = current_time
-                    
-                    if self.sequence_active:
+
+                    if self.sequence_active and self.active_sequence == 'semi_auto':
                         self.sequence_active = False
+                        self.semi_auto_sequence_running = False
+                        self.sequence_running = self.auto_type_sequence_running or self.jjs_sequence_running
+                        if not self.sequence_running:
+                            self.active_sequence = None
                     else:
+                        self.sequence_active = False
+                        self.auto_type_sequence_running = False
+                        self.semi_auto_sequence_running = False
+                        self.jjs_sequence_running = False
+                        self.sequence_running = False
+                        self.active_sequence = 'semi_auto'
+
                         has_char = hasattr(key, 'char') and key.char
                         self.sequence_active = True
                         self.after(0, self.start_semi_auto_sequence, self.semi_auto_start_num, has_char)
@@ -1115,9 +1183,20 @@ class AutoJJSApp(ctk.CTk):
                 if current_time - self.last_hotkey_time > 0.2:
                     self.last_hotkey_time = current_time
 
-                    if self.sequence_active:
+                    if self.sequence_active and self.active_sequence == 'jjs':
                         self.sequence_active = False
+                        self.jjs_sequence_running = False
+                        self.sequence_running = self.auto_type_sequence_running or self.semi_auto_sequence_running
+                        if not self.sequence_running:
+                            self.active_sequence = None
                     else:
+                        self.sequence_active = False
+                        self.auto_type_sequence_running = False
+                        self.semi_auto_sequence_running = False
+                        self.jjs_sequence_running = False
+                        self.sequence_running = False
+                        self.active_sequence = 'jjs'
+
                         has_char = hasattr(key, 'char') and key.char
                         self.sequence_active = True
                         self.after(0, self.start_jjs_sequence, self.jjs_start_num, has_char)
@@ -1243,9 +1322,15 @@ class AutoJJSApp(ctk.CTk):
 
     def start_continuous_sequence(self, start_num=1, needs_backspace=False):
         """Inicia a digitação automática contínua de números por extenso"""
-        # Evita múltiplas threads da mesma sequência
-        if hasattr(self, 'sequence_running') and self.sequence_running:
+        if getattr(self, 'auto_type_sequence_running', False):
             return
+
+        self.auto_typer.fail_count = 0
+        self.auto_type_sequence_running = True
+        self.semi_auto_sequence_running = False
+        self.jjs_sequence_running = False
+        self.sequence_running = True
+        self.active_sequence = 'auto_type'
 
         # Usa os limites independentes da aba Auto Type
         auto_start = self.auto_type_start_num
@@ -1310,9 +1395,16 @@ class AutoJJSApp(ctk.CTk):
                         
                         time.sleep(0.25)
                         if not self.auto_typer.check_message_sent():
+                            self.auto_typer.fail_count += 1
+                            if not self.auto_typer.is_discord_active():
+                                self.sequence_active = False
+                                self.typing_automatically = False
+                                self.after(0, lambda: self.footer_hint.configure(text="⚠️ PARADO: Discord não está aceitando mensagens (castigo/timeout)", text_color=self.color_btn_danger))
+                                break
                             self.auto_typer.clear_textbox()
                             self.after(0, lambda: self.footer_hint.configure(text="⚠️ Aviso: mensagem não confirmada, continuando...", text_color="#ffcc00"))
                         else:
+                            self.auto_typer.fail_count = 0
                             local_fail_count = 0
                     
                     # Desmarca para permitir toggle
@@ -1336,7 +1428,12 @@ class AutoJJSApp(ctk.CTk):
             finally:
                 # Garante que a sequência seja desativada quando terminar
                 self.sequence_active = False
-                self.sequence_running = False
+                self.auto_type_sequence_running = False
+                self.sequence_running = (
+                    self.semi_auto_sequence_running or self.jjs_sequence_running
+                )
+                if not self.sequence_running:
+                    self.active_sequence = None
                 self.typing_automatically = False  # Marca que o programa parou de digitar
                 # Restaura o hint original se não houver erro (ou após um tempo)
                 self.after(3000, lambda: self.footer_hint.configure(
@@ -1390,8 +1487,15 @@ class AutoJJSApp(ctk.CTk):
 
     def start_semi_auto_sequence(self, start_num=1, needs_backspace=False):
         """Inicia a digitação automática semi-automática (com prefixo e pulo de proteção)"""
-        if hasattr(self, 'sequence_running') and self.sequence_running:
+        if getattr(self, 'semi_auto_sequence_running', False):
             return
+
+        self.auto_typer.fail_count = 0
+        self.semi_auto_sequence_running = True
+        self.auto_type_sequence_running = False
+        self.jjs_sequence_running = False
+        self.sequence_running = True
+        self.active_sequence = 'semi_auto'
 
         semi_start = self.semi_auto_start_num
         semi_end = self.semi_auto_end_num
@@ -1448,6 +1552,19 @@ class AutoJJSApp(ctk.CTk):
                         self.keyboard_controller.release(keyboard.Key.enter)
                         self.is_typing_char = False
                         
+                        time.sleep(0.2)
+                        if not self.auto_typer.check_message_sent():
+                            self.auto_typer.fail_count += 1
+                            if not self.auto_typer.is_discord_active():
+                                self.sequence_active = False
+                                self.typing_automatically = False
+                                self.after(0, lambda: self.footer_hint.configure(text="⚠️ PARADO: Discord não está aceitando mensagens (castigo/timeout)", text_color=self.color_btn_danger))
+                                break
+                            self.auto_typer.clear_textbox()
+                            self.after(0, lambda: self.footer_hint.configure(text="⚠️ Aviso: mensagem não confirmada, continuando...", text_color="#ffcc00"))
+                        else:
+                            self.auto_typer.fail_count = 0
+
                     # 4. Pula Animação (Espaço) se habilitado
                     if self.semi_auto_skip_space and self.sequence_active:
                         time.sleep(0.3) # Maior delay para garantir que o chat do Roblox fechou
@@ -1492,8 +1609,15 @@ class AutoJJSApp(ctk.CTk):
 
     def start_jjs_sequence(self, start_num=1, needs_backspace=False):
         """Inicia a digitação automática JJS: Número -> Palavra 1 -> Palavra 2"""
-        if hasattr(self, 'sequence_running') and self.sequence_running:
+        if getattr(self, 'jjs_sequence_running', False):
             return
+
+        self.auto_typer.fail_count = 0
+        self.jjs_sequence_running = True
+        self.auto_type_sequence_running = False
+        self.semi_auto_sequence_running = False
+        self.sequence_running = True
+        self.active_sequence = 'jjs'
 
         jjs_start = self.jjs_start_num
         jjs_end = self.jjs_end_num
@@ -1525,30 +1649,21 @@ class AutoJJSApp(ctk.CTk):
                 time.sleep(0.1)
 
                 current_num = start_num
-                while self.jjs_enabled and self.sequence_active:
-                    # 1. Enviar o Número por extenso
-                    text_num = self.numero_para_extenso(current_num)
-                    if self.exclamation_format == "junta":
-                        text_num += "!"
-                    else:
-                        text_num += " !"
-                    
-                    if not self._jjs_type_and_send(text_num): break
-                    
-                    # 2. Enviar Palavra 1
-                    if not self._jjs_type_and_send(self.jjs_word1): break
-                    
-                    # 3. Enviar Palavra 2
-                    if not self._jjs_type_and_send(self.jjs_word2): break
-                    
+                while self.jjs_enabled and self.sequence_active and current_num <= jjs_end:
+                    for text in self._build_jjs_sequence(current_num):
+                        if not self.sequence_active:
+                            return
+
+                        if not self._jjs_type_and_send(text):
+                            if not self.sequence_active:
+                                self.jjs_contador = current_num
+                                return
+                            continue
+
                     current_num += 1
                     self.jjs_contador = current_num
-                    self.jjs_start_num = current_num
-                    self.after(0, self._update_jjs_entry, current_num)
-                    
-                    if current_num > jjs_end:
-                        self.sequence_active = False
-                        break
+
+                self.sequence_active = False
                         
             except Exception as e:
                 print(f"Erro na sequência JJS: {e}")
@@ -1597,6 +1712,18 @@ class AutoJJSApp(ctk.CTk):
             self.is_typing_char = False
             
             time.sleep(0.3)
+
+            if not self.auto_typer.check_message_sent():
+                self.auto_typer.fail_count += 1
+                if not self.auto_typer.is_discord_active():
+                    self.sequence_active = False
+                    self.typing_automatically = False
+                    self.after(0, lambda: self.footer_hint.configure(text="⚠️ PARADO: Discord não está aceitando mensagens (castigo/timeout)", text_color=self.color_btn_danger))
+                    return False
+                self.auto_typer.clear_textbox()
+                self.after(0, lambda: self.footer_hint.configure(text="⚠️ Aviso: mensagem não confirmada, continuando...", text_color="#ffcc00"))
+            else:
+                self.auto_typer.fail_count = 0
 
         self.typing_automatically = False
         return True
