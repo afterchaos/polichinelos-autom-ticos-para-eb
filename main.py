@@ -17,6 +17,21 @@ REPO_OWNER = "afterchaos"
 REPO_NAME = "polichinelos-autom-ticos-para-eb"
 EXECUTABLE_NAME = "AutoJJS.exe"
 
+# Delay mínimo garantido entre cada tecla digitada. Valores muito baixos fazem
+# o Windows "perder" a última letra de uma palavra (comum com teclas de Shift,
+# como letras maiúsculas seguidas de "!"), cortando o texto final
+# (ex: "QUINZE!" virava "QUINZ!", "DEZESSEIS!" virava "DEZESEI!").
+MIN_CHAR_DELAY = 0.02
+
+# Jogos (como o Roblox) lêem o teclado via polling/raw input, e não pela fila
+# de mensagens do Windows como um app normal. Se a tecla for pressionada e
+# solta rápido demais, o jogo pode não "ver" a tecla no meio do caminho e a
+# letra simplesmente some. Por isso, ao digitar em modos usados dentro de
+# jogos, cada tecla precisa ficar pressionada por um tempo mínimo antes de
+# ser solta.
+KEY_HOLD_TIME = 0.015
+GAME_MIN_CHAR_DELAY = 0.035
+
 
 # Configurações do CustomTkinter
 ctk.set_appearance_mode("dark")
@@ -1320,12 +1335,57 @@ class AutoJJSApp(ctk.CTk):
         except Exception as e:
             print(f"Erro ao processar tecla normal: {e}")
 
+    # Símbolos que dependem de Shift e sua tecla "base" (sem shift) no layout US
+    SHIFT_SYMBOLS = {
+        '!': '1', '@': '2', '#': '3', '$': '4', '%': '5', '&': '7', '*': '8',
+        '(': '9', ')': '0', '_': '-', '+': '=', ':': ';', '"': "'",
+        '<': ',', '>': '.', '?': '/', '~': '`', '{': '[', '}': ']', '|': '\\',
+    }
+
+    def _type_text_reliably(self, text, char_delay):
+        """Digita um texto segurando o Shift continuamente quando necessário,
+        em vez de apertar/soltar o Shift a cada caractere (como o `type()` do
+        pynput faz sozinho).
+
+        Como todo o texto digitado é em maiúsculas, ligar e desligar o Shift
+        muito rápido a cada letra faz jogos como o Roblox (que leem teclado
+        via polling/raw input, não pela fila de mensagens do Windows) perder
+        justamente a tecla na hora da troca — é por isso que "CINCO!" virava
+        "CINC!" e "DEZOITO!" virava "DEZOIT!": sempre a letra bem antes do
+        "!", exatamente onde o Shift soltava e apertava de novo em seguida.
+        Mantendo o Shift pressionado do início ao fim da palavra, essa troca
+        de estado no meio do caminho deixa de existir.
+        """
+        needs_shift = any(c.isalpha() or c in self.SHIFT_SYMBOLS for c in text)
+        if needs_shift:
+            self.keyboard_controller.press(keyboard.Key.shift)
+            time.sleep(KEY_HOLD_TIME)
+        try:
+            for char in text:
+                if not self.sequence_active:
+                    break
+                self.is_typing_char = True
+                if char == ' ':
+                    base_key = keyboard.Key.space
+                elif char.isalpha():
+                    base_key = char.lower()
+                else:
+                    base_key = self.SHIFT_SYMBOLS.get(char, char)
+                self.keyboard_controller.press(base_key)
+                time.sleep(KEY_HOLD_TIME)
+                self.keyboard_controller.release(base_key)
+                self.is_typing_char = False
+                time.sleep(char_delay)
+        finally:
+            if needs_shift:
+                time.sleep(KEY_HOLD_TIME)
+                self.keyboard_controller.release(keyboard.Key.shift)
+
     def start_continuous_sequence(self, start_num=1, needs_backspace=False):
         """Inicia a digitação automática contínua de números por extenso"""
         if getattr(self, 'auto_type_sequence_running', False):
             return
 
-        self.auto_typer.fail_count = 0
         self.auto_type_sequence_running = True
         self.semi_auto_sequence_running = False
         self.jjs_sequence_running = False
@@ -1356,14 +1416,8 @@ class AutoJJSApp(ctk.CTk):
                     self.is_typing_char = False
 
                 current_num = start_num
-                local_fail_count = 0
                 # Inicia a sequência enquanto habilitada e ativa
                 while self.auto_type_enabled and self.sequence_active:
-                    if not self.auto_typer.is_discord_active():
-                        self.sequence_active = False
-                        self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
-                        break
-
                     # Limpa o campo de texto antes de digitar para evitar marcadores residuais
                     self.auto_typer.clear_textbox()
                     time.sleep(0.1)
@@ -1377,35 +1431,18 @@ class AutoJJSApp(ctk.CTk):
                     # Marca que o programa está digitando para o listener ignorar
                     self.typing_automatically = True
                     
-                    # Digita o texto usando o controller direto
-                    for char in text:
-                        if not self.sequence_active: break
-                        self.is_typing_char = True
-                        self.keyboard_controller.type(char)
-                        time.sleep(0.0001)
-                        self.is_typing_char = False
-                        time.sleep(self.auto_type_delay_ms / 1000.0)
+                    # Digita o texto inteiro mantendo o Shift seguro do início ao fim
+                    char_delay = max(self.auto_type_delay_ms / 1000.0, MIN_CHAR_DELAY)
+                    self._type_text_reliably(text, char_delay)
                     
                     # Envia Enter automaticamente se estiver habilitado
                     if self.auto_send_enter and self.sequence_active:
+                        time.sleep(char_delay)
                         self.is_typing_char = True
                         self.keyboard_controller.press(keyboard.Key.enter)
+                        time.sleep(KEY_HOLD_TIME)
                         self.keyboard_controller.release(keyboard.Key.enter)
                         self.is_typing_char = False
-                        
-                        time.sleep(0.25)
-                        if not self.auto_typer.check_message_sent():
-                            self.auto_typer.fail_count += 1
-                            if not self.auto_typer.is_discord_active():
-                                self.sequence_active = False
-                                self.typing_automatically = False
-                                self.after(0, lambda: self.footer_hint.configure(text="⚠️ PARADO: Discord não está aceitando mensagens (castigo/timeout)", text_color=self.color_btn_danger))
-                                break
-                            self.auto_typer.clear_textbox()
-                            self.after(0, lambda: self.footer_hint.configure(text="⚠️ Aviso: mensagem não confirmada, continuando...", text_color="#ffcc00"))
-                        else:
-                            self.auto_typer.fail_count = 0
-                            local_fail_count = 0
                     
                     # Desmarca para permitir toggle
                     self.typing_automatically = False
@@ -1459,7 +1496,7 @@ class AutoJJSApp(ctk.CTk):
         
         # Digita o texto diretamente sem usar Ctrl+V
         def type_text():
-            self.keyboard_controller.type(texto)
+            self._type_text_reliably(texto, max(self.auto_type_delay_ms / 1000.0, MIN_CHAR_DELAY))
             self.next_number()
         
         # Executa a digitação em um thread separado para não travar a interface
@@ -1490,7 +1527,6 @@ class AutoJJSApp(ctk.CTk):
         if getattr(self, 'semi_auto_sequence_running', False):
             return
 
-        self.auto_typer.fail_count = 0
         self.semi_auto_sequence_running = True
         self.auto_type_sequence_running = False
         self.jjs_sequence_running = False
@@ -1518,6 +1554,10 @@ class AutoJJSApp(ctk.CTk):
                     self.is_typing_char = False
 
                 current_num = start_num
+                # Este modo digita dentro do jogo (Roblox), que lê teclado via
+                # polling/raw input — por isso usa um piso de delay maior e
+                # segura cada tecla por mais tempo, evitando letras "comidas".
+                char_delay = max(self.semi_auto_delay_ms / 1000.0, GAME_MIN_CHAR_DELAY)
                 while self.semi_auto_enabled and self.sequence_active:
                     # Não verifica se o Discord está ativo aqui, pois esse modo é focado no jogo (Roblox)
 
@@ -1532,38 +1572,21 @@ class AutoJJSApp(ctk.CTk):
                     # 1. Digita o Prefixo
                     if self.semi_auto_prefix_key:
                         self.is_typing_char = True
-                        self.keyboard_controller.type(self.semi_auto_prefix_key)
-                        time.sleep(self.semi_auto_delay_ms / 1000.0)
+                        self._type_text_reliably(self.semi_auto_prefix_key, char_delay)
+                        time.sleep(char_delay)
                         self.is_typing_char = False
                     
-                    # 2. Digita o texto JJS
-                    for char in text:
-                        if not self.sequence_active: break
-                        self.is_typing_char = True
-                        self.keyboard_controller.type(char)
-                        time.sleep(0.0001)
-                        self.is_typing_char = False
-                        time.sleep(self.semi_auto_delay_ms / 1000.0)
+                    # 2. Digita o texto JJS (inteiro, mantendo o Shift seguro do início ao fim)
+                    self._type_text_reliably(text, char_delay)
                     
                     # 3. Envia Enter
                     if self.semi_auto_send_enter and self.sequence_active:
+                        time.sleep(char_delay)
                         self.is_typing_char = True
                         self.keyboard_controller.press(keyboard.Key.enter)
+                        time.sleep(KEY_HOLD_TIME)
                         self.keyboard_controller.release(keyboard.Key.enter)
                         self.is_typing_char = False
-                        
-                        time.sleep(0.2)
-                        if not self.auto_typer.check_message_sent():
-                            self.auto_typer.fail_count += 1
-                            if not self.auto_typer.is_discord_active():
-                                self.sequence_active = False
-                                self.typing_automatically = False
-                                self.after(0, lambda: self.footer_hint.configure(text="⚠️ PARADO: Discord não está aceitando mensagens (castigo/timeout)", text_color=self.color_btn_danger))
-                                break
-                            self.auto_typer.clear_textbox()
-                            self.after(0, lambda: self.footer_hint.configure(text="⚠️ Aviso: mensagem não confirmada, continuando...", text_color="#ffcc00"))
-                        else:
-                            self.auto_typer.fail_count = 0
 
                     # 4. Pula Animação (Espaço) se habilitado
                     if self.semi_auto_skip_space and self.sequence_active:
@@ -1612,7 +1635,6 @@ class AutoJJSApp(ctk.CTk):
         if getattr(self, 'jjs_sequence_running', False):
             return
 
-        self.auto_typer.fail_count = 0
         self.jjs_sequence_running = True
         self.auto_type_sequence_running = False
         self.semi_auto_sequence_running = False
@@ -1638,11 +1660,6 @@ class AutoJJSApp(ctk.CTk):
                     self.keyboard_controller.release(keyboard.Key.backspace)
                     time.sleep(0.05)
                     self.is_typing_char = False
-
-                if not self.auto_typer.is_discord_active():
-                    self.sequence_active = False
-                    self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
-                    return
 
                 # Garante que a caixa de texto esteja limpa antes da sequência JJS
                 self.auto_typer.clear_textbox()
@@ -1683,12 +1700,6 @@ class AutoJJSApp(ctk.CTk):
     def _jjs_type_and_send(self, text):
         """Método auxiliar para digitar e enviar com proteções"""
         if not self.sequence_active: return False
-        
-        # Verifica Discord
-        if not self.auto_typer.is_discord_active():
-            self.sequence_active = False
-            self.after(0, lambda: self.footer_hint.configure(text="❌ ERRO: Discord não está em foco", text_color=self.color_btn_danger))
-            return False
 
         # Limpa o campo antes de digitar para evitar marcadores residuais
         self.auto_typer.clear_textbox()
@@ -1696,34 +1707,18 @@ class AutoJJSApp(ctk.CTk):
 
         self.typing_automatically = True
         
-        # Digita
-        for char in text:
-            if not self.sequence_active: break
-            self.is_typing_char = True
-            self.keyboard_controller.type(char)
-            self.is_typing_char = False
-            time.sleep(self.jjs_delay_ms / 1000.0)
+        # Digita o texto inteiro mantendo o Shift seguro do início ao fim
+        char_delay = max(self.jjs_delay_ms / 1000.0, MIN_CHAR_DELAY)
+        self._type_text_reliably(text, char_delay)
         
         # Envia Enter
         if self.jjs_auto_send_enter and self.sequence_active:
+            time.sleep(char_delay)
             self.is_typing_char = True
             self.keyboard_controller.press(keyboard.Key.enter)
+            time.sleep(KEY_HOLD_TIME)
             self.keyboard_controller.release(keyboard.Key.enter)
             self.is_typing_char = False
-            
-            time.sleep(0.3)
-
-            if not self.auto_typer.check_message_sent():
-                self.auto_typer.fail_count += 1
-                if not self.auto_typer.is_discord_active():
-                    self.sequence_active = False
-                    self.typing_automatically = False
-                    self.after(0, lambda: self.footer_hint.configure(text="⚠️ PARADO: Discord não está aceitando mensagens (castigo/timeout)", text_color=self.color_btn_danger))
-                    return False
-                self.auto_typer.clear_textbox()
-                self.after(0, lambda: self.footer_hint.configure(text="⚠️ Aviso: mensagem não confirmada, continuando...", text_color="#ffcc00"))
-            else:
-                self.auto_typer.fail_count = 0
 
         self.typing_automatically = False
         return True
